@@ -1,4 +1,4 @@
-// DompetKu Ultimate Version 7.4 (Audited & Patched)
+// DompetKu Ultimate Version 7.5 (WebAuthn & Sync Patched)
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
@@ -16,7 +16,7 @@ import {
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const G = "#2DAB7F", G2 = "#1d8a63", GL = "#E8F7F1", GM = "#b6e4d0", BG = "#F0F3F7";
 
-// ─── BRAND MAP (dual-color gradients with brand primary + accent) ─────────────
+// ─── BRAND MAP ────────────────────────────────────────────────────────────────
 const BRAND_MAP = {
   bca:       "linear-gradient(135deg,#0053A0,#2196F3)",
   bri:       "linear-gradient(135deg,#003F88,#1976D2)",
@@ -174,17 +174,44 @@ const getTxnDetailFields = (txn) => {
   return [{key:"catatan_detail",label:"Catatan Tambahan",placeholder:"Tambahkan catatan...",icon:<Receipt size={14}/>}];
 };
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ─── HELPERS & WEBAUTHN ──────────────────────────────────────────────────────
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
+
+const getBioChallenge = () => {
+  const c = new Uint8Array(32); window.crypto.getRandomValues(c); return c;
+};
+const enableBiometrics = async () => {
+  if (!window.PublicKeyCredential) { alert("Browser/Perangkat tidak mendukung Biometrik."); return false; }
+  try {
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: getBioChallenge(), rp: { name: "DompetKu App" },
+        user: { id: getBioChallenge(), name: "user@dompetku", displayName: "Pengguna DompetKu" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+        timeout: 60000,
+      }
+    });
+    return !!cred;
+  } catch (err) { alert("Gagal mengaktifkan biometrik: " + err.message); return false; }
+};
+const verifyBiometrics = async () => {
+  if (!window.PublicKeyCredential) return false;
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: { challenge: getBioChallenge(), userVerification: "required", timeout: 60000 }
+    });
+    return !!assertion;
+  } catch (err) { return false; }
 };
 
 const fmt       = n => "Rp " + Math.abs(n).toLocaleString("id-ID");
 const fmtShort  = n => n>=1e9?(n/1e9).toFixed(1)+"M":n>=1e6?(n/1e6).toFixed(1)+"Jt":n>=1e3?(n/1e3).toFixed(0)+"K":String(n);
 const mask      = n => "Rp " + "•".repeat(Math.min(7,String(Math.round(n)).length));
 
-// Timezone safe dates
 const getLocalISOString = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10);
 const todayStr  = () => getLocalISOString();
 const nowTime   = () => new Date().toTimeString().slice(0,5);
@@ -308,7 +335,11 @@ function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, o
   };
   
   const del = () => { if(step==="confirm")setConfirm(c=>c.slice(0,-1)); else setInput(i=>i.slice(0,-1)); };
-  const handleBio = () => { onUnlock(); }; // Mockup for Biometrics
+  
+  const handleBio = async () => { 
+    const verified = await verifyBiometrics();
+    if (verified) onUnlock(); else setErr("Biometrik gagal/dibatalkan.");
+  };
 
   const cur = step==="confirm"?confirm:input;
   return (
@@ -463,7 +494,6 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
       </Inp>
       {showCustom&&<Inp label="NAMA MANUAL" mb={10}><input value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="cth: Bank Anda, GoPay Bisnis..." style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/></Inp>}
       <Inp label="4 DIGIT TERAKHIR (OPSIONAL)" mb={10}>
-        {/* Validasi string hanya angka */}
         <input value={acc.last4||""} onChange={e=>s("last4",e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="xxxx" maxLength={4} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/>
       </Inp>
 
@@ -505,7 +535,6 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
         )}
         <div style={{background:curGrad,borderRadius:12,padding:"14px",marginTop:8,display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}>
-            {/* Fallback jika tipe tidak ditemukan */}
             {acc.iconImg ? <img src={acc.iconImg} alt="" style={{width:26,height:26,borderRadius:7,objectFit:"cover"}}/> : (() => { const T=ACC_TYPES.find(t=>t.type===acc.type); return T?<T.Icon s={20}/>:<Wallet size={20}/>; })()}
           </div>
           <div><p style={{color:"rgba(255,255,255,0.8)",fontSize:10,margin:"0 0 2px"}}>{finalName||"Nama Akun"}</p><p style={{color:"#fff",fontSize:14,fontWeight:800,margin:0}}>Rp 0</p></div>
@@ -534,7 +563,7 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
 
 // ─── TXN DETAIL SHEET ─────────────────────────────────────────────────────────
 function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
-  const acc      = accounts.find(a=>a.id===txn.accountId);
+  const acc      = accounts.find(a=>String(a.id)===String(txn.accountId));
   const fields   = getTxnDetailFields(txn);
   const [details, setDetails] = useState(txn.details || {});
   const [editing, setEditing] = useState(false);
@@ -547,7 +576,7 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
       IDB.get(a.id).then(d=>{if(active&&d)setAttachSrcs(p=>({...p,[a.id]:d}))}).catch(()=>{}); 
     });
     return () => { active = false; };
-  },[txn.id, txn.attachmentMeta]); // Safe dependency tracking
+  },[txn.id, txn.attachmentMeta]); 
   
   const save = () => { onEdit({...txn, details}); setEditing(false); };
   const grad = acc ? getAccGrad(acc, accounts.indexOf(acc)) : `linear-gradient(135deg,${G},${G2})`;
@@ -615,8 +644,7 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
 // ─── ADD / EDIT TRANSACTION MODAL ─────────────────────────────────────────────
 function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingFile }) {
   const isEdit = !!initial;
-  // Initialize correctly handling initial details
-  const [form, setForm] = useState(() => initial || { type:"expense", amountStr:"", category:"Makan & Minum", note:"", date:todayStr(), time:nowTime(), accountId:accounts[0]?.id, attachmentMeta:[], details: {} });
+  const [form, setForm] = useState(() => initial || { type:"expense", amountStr:"", category:"Makan & Minum", note:"", date:todayStr(), time:nowTime(), accountId:String(accounts[0]?.id), attachmentMeta:[], details: {} });
   const [detected, setDetected] = useState(null);
   const fileRef = useRef();
   const s = (k,v) => setForm(f=>({...f,[k]:v}));
@@ -666,7 +694,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
         </div>
       </Inp>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <Inp label="AKUN" mb={0}>{accounts.length===0?<p style={{margin:0,fontSize:12,color:"#ef4444"}}>Buat akun dulu!</p>:<select value={form.accountId} onChange={e=>s("accountId",parseInt(e.target.value))} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>}</Inp>
+        <Inp label="AKUN" mb={0}>{accounts.length===0?<p style={{margin:0,fontSize:12,color:"#ef4444"}}>Buat akun dulu!</p>:<select value={form.accountId} onChange={e=>s("accountId",String(e.target.value))} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>}</Inp>
         <Inp label="TANGGAL" mb={0}><input type="date" value={form.date} onChange={e=>s("date",e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",colorScheme:"light"}}/></Inp>
       </div>
       <Inp label="JAM" mb={10}><input type="time" value={form.time||nowTime()} onChange={e=>s("time",e.target.value)} style={{background:"transparent",border:"none",outline:"none",fontSize:14,fontWeight:600,color:"#111",colorScheme:"light"}}/></Inp>
@@ -723,7 +751,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
         const rt=ti>=0?String(row[ti]).toLowerCase():"";const isInc=rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
         let pd=todayStr();if(di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=getLocalISOString(d);}catch{}}
         const rc=ci>=0?String(row[ci]):"";const cat=Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
-        parsed.push({id:generateId(),type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"",accountId:accounts[0].id,detected:null,attachmentMeta:[]});
+        parsed.push({id:generateId(),type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"",accountId:String(accounts[0].id),detected:null,attachmentMeta:[]});
       }
       if(!parsed.length){setErr("Tidak ada data valid.");setSt("error");return;}
       setPreview(parsed);setSt("preview");
@@ -742,7 +770,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
 
 // ─── ACCOUNT DETAIL SCREEN ────────────────────────────────────────────────────
 function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAccount }) {
-  const txns   = [...transactions].filter(t=>t.accountId===account.id).sort(sortByDateDesc);
+  const txns   = [...transactions].filter(t=>String(t.accountId)===String(account.id)).sort(sortByDateDesc);
   const income  = txns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const expense = txns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const grad    = getAccGrad(account,accIdx);
@@ -804,11 +832,35 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
   const show         = v => hidden ? mask(v) : fmt(v);
   const recent       = [...transactions].sort(sortByDateDesc).slice(0,5);
 
-  const dLeft = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate() - new Date().getDate();
-  const daysPassed = new Date().getDate();
-  const avgDailyExp = daysPassed > 0 ? totalExpense / daysPassed : 0;
-  const estEndBal = Math.max(0, totalBalance - (avgDailyExp * Math.max(1, dLeft)));
-  const estZeroDays = avgDailyExp > 0 ? Math.floor(totalBalance / avgDailyExp) : (totalBalance > 0 ? "999+" : 0);
+  // FIX: Prediksi tidak berasumsi income 0. Gunakan income bulan lalu / bulan ini.
+  const dLeft = daysLeftMonth();
+  const daysPassed = Math.max(1, new Date().getDate());
+  const avgDailyExp = totalExpense / daysPassed;
+  const estMonthlyExp = avgDailyExp * new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
+
+  const now = new Date();
+  const lastMStart = getLocalISOString(new Date(now.getFullYear(), now.getMonth()-1, 1));
+  const lastMEnd = getLocalISOString(new Date(now.getFullYear(), now.getMonth(), 0));
+  const lastMIncome = transactions.filter(t=>t.type==="income" && t.date>=lastMStart && t.date<=lastMEnd).reduce((s,t)=>s+t.amount,0);
+  
+  const assumedIncome = lastMIncome > 0 ? lastMIncome : totalIncome;
+  const expectedRemainingIncomeThisMonth = Math.max(0, assumedIncome - totalIncome);
+  const estEndBal = totalBalance + expectedRemainingIncomeThisMonth - (avgDailyExp * Math.max(1, dLeft));
+
+  const monthlyNet = assumedIncome - estMonthlyExp;
+  let estZeroDaysStr = "";
+  let brokeDateStr = "";
+
+  if (monthlyNet >= 0 || totalBalance <= 0) {
+    estZeroDaysStr = "Bertumbuh / Stabil";
+    brokeDateStr = "Aman (Surplus)";
+  } else {
+    const monthsTillBroke = totalBalance / Math.abs(monthlyNet);
+    const daysTillBroke = Math.round(monthsTillBroke * 30.44); // Rata-rata hari per bulan
+    const brokeDate = new Date(Date.now() + daysTillBroke * 86400000);
+    brokeDateStr = brokeDate.toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"});
+    estZeroDaysStr = `${daysTillBroke} hari lagi`;
+  }
 
   return (
     <div style={{padding:"0 16px 16px"}}>
@@ -863,14 +915,25 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         
         {/* Predictor Card */}
         <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
-           <Card style={{height:"100%", marginBottom:0}}>
-             <Row style={{marginBottom:10}}>
-                <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Budget Predictor</p>
-                <TrendingUp size={16} color={G}/>
+           <Card style={{height:"100%", marginBottom:0, background:"linear-gradient(135deg,#1e1b4b,#312e81)"}}>
+             <Row style={{marginBottom:8}}>
+                <p style={{margin:0,fontSize:14,fontWeight:800,color:"#fff"}}>Prediksi Keuangan</p>
+                <TrendingUp size={16} color="#818cf8"/>
              </Row>
-             <p style={{fontSize:11, color:"#6b7280", margin:"0 0 8px", lineHeight:1.4}}>Berdasarkan pengeluaran harian {fmtShort(avgDailyExp)}, di akhir bulan saldo sisa:</p>
-             <p style={{fontSize:20, fontWeight:800, color:estEndBal>0?G:"#ef4444", margin:"0 0 10px"}}>{show(estEndBal)}</p>
-             <p style={{fontSize:11, color:"#9ca3af", margin:0}}>Asumsi 0 income, uang akan habis dalam <b style={{color:"#111"}}>{estZeroDays} hari</b>.</p>
+             <p style={{fontSize:10, color:"rgba(255,255,255,0.7)", margin:"0 0 10px", lineHeight:1.4}}>Asumsi tren pemasukan bln ini: <b>{fmtShort(assumedIncome)}</b></p>
+             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+               <div style={{background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px"}}>
+                  <p style={{color:"rgba(255,255,255,0.6)",fontSize:9,fontWeight:700,margin:"0 0 4px",letterSpacing:.5}}>SISA ASET (EST. BLN INI)</p>
+                  <p style={{color:estEndBal>=0?"#86efac":"#fca5a5",fontSize:15,fontWeight:800,margin:0}}>{hidden?mask(Math.abs(estEndBal)):fmt(estEndBal)}</p>
+               </div>
+               <div style={{background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px"}}>
+                  <p style={{color:"rgba(255,255,255,0.6)",fontSize:9,fontWeight:700,margin:"0 0 4px",letterSpacing:.5}}>ASET HABIS PERKIRAAN</p>
+                  {monthlyNet >= 0 
+                    ? <p style={{color:"#86efac",fontSize:13,fontWeight:700,margin:"0"}}>Surplus / Aman 🎉</p>
+                    : <><p style={{color:"#fca5a5",fontSize:13,fontWeight:800,margin:"0"}}>{brokeDateStr}</p><p style={{color:"rgba(255,255,255,0.5)",fontSize:10,margin:"2px 0 0"}}>{estZeroDaysStr}</p></>
+                  }
+               </div>
+             </div>
            </Card>
         </div>
       </div>
@@ -895,7 +958,7 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
       <Card style={{padding:"4px 0"}}>
         {recent.length===0&&<p style={{color:"#9ca3af",textAlign:"center",padding:"20px",fontSize:13}}>Belum ada transaksi</p>}
         {recent.map((t,i)=>{
-          const acc=accounts.find(a=>a.id===t.accountId);
+          const acc=accounts.find(a=>String(a.id)===String(t.accountId));
           return (
             <button type="button" key={t.id} onClick={()=>onTxnClick(t)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<recent.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
               <CatBub cat={t.category}/>
@@ -936,7 +999,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
     if(search.trim()){
       const q=search.toLowerCase();
       arr=arr.filter(t=>{
-         const accName = accounts.find(a=>a.id===t.accountId)?.name || "";
+         const accName = accounts.find(a=>String(a.id)===String(t.accountId))?.name || "";
          return t.note?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q) || accName.toLowerCase().includes(q);
       });
     }
@@ -974,7 +1037,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
           <p style={{fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1,margin:"0 0 8px 2px"}}>{labelDate(date)}</p>
           <Card style={{padding:"4px 0",marginBottom:12}}>
             {txns.map((t,i)=>{
-              const acc=accounts.find(a=>a.id===t.accountId);
+              const acc=accounts.find(a=>String(a.id)===String(t.accountId));
               return (
                 <button type="button" key={t.id} onClick={()=>onTxnClick(t)}
                   style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<txns.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
@@ -1061,7 +1124,7 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
                   <button type="button" onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
                   <button type="button" onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
                   <button type="button" onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
-                  <button type="button" onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
+                  <button type="button" onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>String(t.accountId)===String(acc.id)).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
                 </div>
               </Card>
             </div>
@@ -1070,7 +1133,7 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
       </div>
       {editAcc&&<AccountModal initial={editAcc.acc} onClose={()=>setEditAcc(null)} isNew={false} onSave={handleSaveAcc}/>}
       {showAdd&&<AccountModal isNew onClose={()=>setShowAdd(false)} onSave={(a,_)=>{setAccounts(p=>[...p,{...a,id:generateId(),balance:a.balance||0}]);setShowAdd(false);}}/>}
-      {delConfirm&&<ConfirmDialog title="Hapus Akun?" sub={`Akun "${delConfirm.acc.name}" dan ${delConfirm.txnCount} transaksi terkait akan dihapus permanen.`} onConfirm={()=>{setAccounts(p=>p.filter(a=>a.id!==delConfirm.acc.id));setTransactions(p=>p.filter(t=>t.accountId!==delConfirm.acc.id));setDelConfirm(null);}} onCancel={()=>setDelConfirm(null)}/>}
+      {delConfirm&&<ConfirmDialog title="Hapus Akun?" sub={`Akun "${delConfirm.acc.name}" dan ${delConfirm.txnCount} transaksi terkait akan dihapus permanen.`} onConfirm={()=>{setAccounts(p=>p.filter(a=>a.id!==delConfirm.acc.id));setTransactions(p=>p.filter(t=>String(t.accountId)!==String(delConfirm.acc.id)));setDelConfirm(null);}} onCancel={()=>setDelConfirm(null)}/>}
     </div>
   );
 }
@@ -1146,9 +1209,14 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
   
   const handleAvatar = e => { const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>setUserAvatar(r.result);r.readAsDataURL(f); };
   const exportCSV = () => {
-    const rows=[["Tanggal","Jam","Jenis","Jumlah","Kategori","Catatan","Akun"],...transactions.map(t=>[t.date,t.time||"",t.type==="income"?"Pemasukan":"Pengeluaran",t.amount,t.category,t.note,accounts.find(a=>a.id===t.accountId)?.name||""])];
+    const rows=[["Tanggal","Jam","Jenis","Jumlah","Kategori","Catatan","Akun"],...transactions.map(t=>[t.date,t.time||"",t.type==="income"?"Pemasukan":"Pengeluaran",t.amount,t.category,t.note,accounts.find(a=>String(a.id)===String(t.accountId))?.name||""])];
     const csv=rows.map(r=>r.map(c=>JSON.stringify(String(c))).join(",")).join("\n");
     const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="DompetKu_export.csv";a.click();
+  };
+
+  const toggleBiometrics = async () => {
+    if (bioEnabled) { setBioEnabled(false); } 
+    else { const success = await enableBiometrics(); if (success) setBioEnabled(true); }
   };
   
   return (
@@ -1167,7 +1235,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>KEAMANAN</p>
         <SRow icon={<Lock size={15} strokeWidth={1.7}/>} title="Kunci PIN" sub={pinEnabled?"Aktif — app terkunci saat keluar background":"Nonaktif"} 
           right={<Tog on={pinEnabled} onToggle={()=>{ if(pinEnabled){setPinEnabled(false);setBioEnabled(false);}else{setShowSetPin(true);} }}/>}/>
-        {pinEnabled&&<SRow icon={<Fingerprint size={15} strokeWidth={1.7}/>} title="Biometrik" sub="Gunakan sidik jari / wajah" right={<Tog on={bioEnabled} onToggle={()=>setBioEnabled(p=>!p)}/> }/>}
+        {pinEnabled&&<SRow icon={<Fingerprint size={15} strokeWidth={1.7}/>} title="Biometrik" sub="Gunakan sidik jari / wajah" right={<Tog on={bioEnabled} onToggle={toggleBiometrics}/> }/>}
         {pinEnabled&&<SRow icon={<Shield size={15} strokeWidth={1.7}/>} title="Ganti PIN" right={<button type="button" onClick={()=>setShowSetPin(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Ubah</button>}/>}
       </Card>
       
@@ -1185,7 +1253,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       
       <Card style={{padding:"4px 0"}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.4 (Audited & Patched)"/>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.5 (Sync & Biometrics)"/>
       </Card>
       
       {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
@@ -1372,23 +1440,23 @@ export default function App() {
 
   const deleteTransaction = useCallback(txn=>{
     setTransactions(p=>p.filter(t=>t.id!==txn.id));
-    setAccounts(p=>p.map(a=>a.id===txn.accountId?{...a,balance:a.balance+(txn.type==="income"?-txn.amount:txn.amount)}:a));
+    setAccounts(p=>p.map(a=>String(a.id)===String(txn.accountId) ? {...a,balance:a.balance+(txn.type==="income"?-txn.amount:txn.amount)} : a));
     (txn.attachmentMeta||[]).forEach(att=>IDB.del(att.id).catch(()=>{}));
   },[]);
 
   const addTransaction = useCallback(form=>{
     const newTxn={...form,id:generateId(),detected:form.detected||null};
     setTransactions(p=>[newTxn,...p]);
-    setAccounts(p=>p.map(a=>a.id===form.accountId?{...a,balance:a.balance+(form.type==="income"?form.amount:-form.amount)}:a));
+    setAccounts(p=>p.map(a=>String(a.id)===String(form.accountId) ? {...a,balance:a.balance+(form.type==="income"?form.amount:-form.amount)} : a));
     setShowAdd(false); setEditTxn(null);
   },[]);
 
   const updateTransaction = useCallback((original,updated)=>{
     setAccounts(p=>p.map(a=>{
       let bal=a.balance;
-      if(a.id===original.accountId)bal+=original.type==="income"?-original.amount:original.amount;
-      if(a.id===updated.accountId) bal+=updated.type==="income"?updated.amount:-updated.amount;
-      return(a.id===original.accountId||a.id===updated.accountId)?{...a,balance:bal}:a;
+      if(String(a.id)===String(original.accountId)) bal += original.type==="income"?-original.amount:original.amount;
+      if(String(a.id)===String(updated.accountId))  bal += updated.type==="income"?updated.amount:-updated.amount;
+      return (String(a.id)===String(original.accountId) || String(a.id)===String(updated.accountId)) ? {...a,balance:bal} : a;
     }));
     setTransactions(p=>p.map(t=>t.id===original.id?{...updated,id:original.id}:t));
     setEditTxn(null); setViewTxn(null);
@@ -1396,9 +1464,8 @@ export default function App() {
 
   const importTxns = useCallback(txns=>{
     setTransactions(p => [...txns, ...p]);
-    // Reconcile imported txns directly to accounts
     setAccounts(p => p.map(a => {
-       const accDiff = txns.filter(t => t.accountId === a.id).reduce((sum, t) => sum + (t.type==="income"?t.amount:-t.amount), 0);
+       const accDiff = txns.filter(t => String(t.accountId) === String(a.id)).reduce((sum, t) => sum + (t.type==="income"?t.amount:-t.amount), 0);
        return accDiff !== 0 ? { ...a, balance: a.balance + accDiff } : a;
     }));
     setShowImport(false);
