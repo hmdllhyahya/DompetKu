@@ -616,10 +616,50 @@ function AttachPreview({ id, type }) {
 // ─── IMPORT MODAL ─────────────────────────────────────────────────────────────
 function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   const [st, setSt] = useState("idle"), [preview, setPreview] = useState([]), [err, setErr] = useState("");
+  const [targetAccountId, setTargetAccountId] = useState(accounts[0]?.id || null);
   const ref = useRef();
+
+  useEffect(() => {
+    setTargetAccountId(prev => accounts.some(a => a.id === prev) ? prev : (accounts[0]?.id || null));
+  }, [accounts]);
+
+  const parseAmount = val => {
+    if (typeof val === "number") return val;
+    const raw = String(val || "").trim().replace(/\s/g, "");
+    if (!raw) return NaN;
+    const comma = raw.includes(","), dot = raw.includes(".");
+    if (comma && dot) {
+      const normalized = raw.lastIndexOf(",") > raw.lastIndexOf(".")
+        ? raw.replace(/\./g, "").replace(",", ".")
+        : raw.replace(/,/g, "");
+      return parseFloat(normalized.replace(/[^\d.-]/g, ""));
+    }
+    if (comma) return parseFloat(raw.replace(/\./g, "").replace(",", ".").replace(/[^\d.-]/g, ""));
+    return parseFloat(raw.replace(/,/g, "").replace(/[^\d.-]/g, ""));
+  };
+
+  const parseDateCell = val => {
+    if (val === undefined || val === null || val === "") return todayStr();
+    if (typeof val === "number") {
+      const parsed = XLSX.SSF.parse_date_code(val);
+      if (parsed) return `${parsed.y}-${String(parsed.m).padStart(2,"0")}-${String(parsed.d).padStart(2,"0")}`;
+    }
+    const s = String(val).trim();
+    const m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+    if (m) {
+      const y = m[3].length === 2 ? `20${m[3]}` : m[3];
+      return `${y.padStart(4,"0")}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    }
+    const d = new Date(s);
+    return isNaN(d) ? todayStr() : d.toISOString().slice(0,10);
+  };
+
   const parse = async e => {
     isPickingFile.current = false;
-    const file = e.target.files[0]; if (!file) return; setSt("parsing");
+    const file = e.target.files[0]; if (!file) return;
+    if (!accounts.length) { setErr("Tambahkan akun terlebih dahulu sebelum import."); setSt("error"); return; }
+    if (!targetAccountId) { setErr("Pilih akun tujuan import."); setSt("error"); return; }
+    setSt("parsing");
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf,{type:"array"}); const ws = wb.Sheets[wb.SheetNames[0]];
@@ -630,16 +670,17 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
       const ai = fc("amount","jumlah","nominal"); if (ai < 0) { setErr("Kolom Amount tidak ditemukan."); setSt("error"); return; }
       const di=fc("date","tanggal"), ni=fc("note","catatan","memo"), ci=fc("category","kategori"), ti=fc("type","jenis");
       const parsed = [];
+      const baseId = Date.now();
       for (let i=1; i<Math.min(rows.length,201); i++) {
         const row = rows[i]; if (!row||row.every(c=>c==="")) continue;
-        const amt = parseFloat(String(row[ai]).replace(/[^\d.-]/g,""));
+        const amt = parseAmount(row[ai]);
         if (!amt||isNaN(amt)) continue;
         const rt = ti>=0?String(row[ti]).toLowerCase():"";
-        const isInc = rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
-        let pd = todayStr(); if (di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=d.toISOString().slice(0,10);}catch{}}
+        const isInc = rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan")||amt > 0;
+        const pd = di>=0 ? parseDateCell(row[di]) : todayStr();
         const rc = ci>=0?String(row[ci]):"";
         const cat = Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
-        parsed.push({id:Date.now()+i,type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,accountId:accounts[0]?.id,detected:null,attachmentMeta:[]});
+        parsed.push({id:baseId+i+Math.floor(Math.random()*1000),type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,accountId:targetAccountId,detected:null,attachmentMeta:[]});
       }
       if (!parsed.length){setErr("Tidak ada data valid.");setSt("error");return;}
       setPreview(parsed); setSt("preview");
@@ -647,7 +688,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   };
   return (
     <BottomSheet onClose={onClose} title="Import Data">
-      {st==="idle"&&<div><div style={{background:GL,borderRadius:13,padding:"13px 15px",marginBottom:14,border:`1px solid ${GM}`}}><p style={{margin:"0 0 5px",fontSize:13,fontWeight:700,color:G}}>Format yang Didukung</p><p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>Money Manager → Settings → Backup → Export Excel (.xlsx)</p></div><BtnG onClick={()=>{isPickingFile.current=true;ref.current.click();}}>Pilih File Excel</BtnG><input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={parse}/></div>}
+      {st==="idle"&&<div><div style={{background:GL,borderRadius:13,padding:"13px 15px",marginBottom:14,border:`1px solid ${GM}`}}><p style={{margin:"0 0 5px",fontSize:13,fontWeight:700,color:G}}>Format yang Didukung</p><p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>Money Manager → Settings → Backup → Export Excel (.xlsx)</p></div><Inp label="AKUN TUJUAN IMPORT" mb={14}><select value={targetAccountId||""} onChange={e=>setTargetAccountId(Number(e.target.value))} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Inp><BtnG onClick={()=>{isPickingFile.current=true;ref.current.click();}} disabled={!accounts.length}>Pilih File Excel</BtnG><input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={parse}/></div>}
       {st==="parsing"&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:36,animation:"spin 1.5s linear infinite",display:"inline-block"}}>⚙️</div><p style={{color:G,marginTop:12}}>Membaca file...</p></div>}
       {st==="error"&&<div style={{textAlign:"center",padding:"20px 0"}}><div style={{color:"#ef4444",display:"flex",justifyContent:"center",marginBottom:12}}><AlertTriangle size={40}/></div><p style={{color:"#ef4444",fontWeight:600,marginBottom:20}}>{err}</p><BtnG onClick={()=>{setSt("idle");setErr("");}}>Coba Lagi</BtnG></div>}
       {st==="preview"&&<div><div style={{background:GL,borderRadius:12,padding:"11px 14px",marginBottom:12,border:`1px solid ${GM}`}}><p style={{margin:0,fontSize:13,fontWeight:700,color:G}}>✓ {preview.length} transaksi ditemukan</p></div><Card style={{padding:"4px 0",marginBottom:12,maxHeight:200,overflowY:"auto"}}>{preview.slice(0,5).map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<4?"1px solid #f8fafc":"none"}}><CatBub cat={t.category} size={36}/><div style={{flex:1,minWidth:0}}><p style={{margin:0,fontSize:12,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note}</p><p style={{margin:0,fontSize:11,color:"#9ca3af"}}>{t.date}</p></div><span style={{fontSize:12,fontWeight:700,color:t.type==="income"?G:"#ef4444",flexShrink:0}}>{t.type==="income"?"+":"-"}{fmtShort(t.amount)}</span></div>)}{preview.length>5&&<p style={{textAlign:"center",color:"#9ca3af",fontSize:11,padding:"8px"}}>...+{preview.length-5} lainnya</p>}</Card><BtnG onClick={()=>{onImport(preview);setSt("done");}}>Import {preview.length} Transaksi</BtnG></div>}
@@ -1069,7 +1110,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       </Card>
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>DATA</p>
-        <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
+        <SRow icon={<Upload size={15}/>} title="Import Data" sub={accounts.length?"Excel dari Money Manager":"Tambah akun dulu sebelum import"} right={<button onClick={()=>setShowImport(true)} disabled={!accounts.length} style={{background:accounts.length?GL:"#e5e7eb",border:"none",borderRadius:9,padding:"6px 12px",color:accounts.length?G:"#9ca3af",fontSize:12,fontWeight:600,cursor:accounts.length?"pointer":"not-allowed"}}>Import</button>}/>
         <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
         <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button onClick={()=>setShowConfirm(true)} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
       </Card>
@@ -1265,7 +1306,16 @@ export default function App() {
     setEditTxn(null);
   }, []);
 
-  const importTxns = txns => setTransactions(p => [...txns, ...p]);
+  const importTxns = useCallback(txns => {
+    setTransactions(p => [...txns, ...p]);
+    setAccounts(p => p.map(acc => {
+      const delta = txns.reduce((sum, t) => {
+        if (t.accountId !== acc.id) return sum;
+        return sum + (t.type === "income" ? t.amount : -t.amount);
+      }, 0);
+      return delta ? { ...acc, balance: acc.balance + delta } : acc;
+    }));
+  }, []);
 
   const titleMap = { home:"Beranda", transactions:"Riwayat", accounts:"Akun", charts:"Analisis", profile:"Profil" };
 
