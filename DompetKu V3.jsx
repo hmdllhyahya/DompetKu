@@ -1,15 +1,15 @@
-// DompetKu v6 – Full rebuild
+// DompetKu v6.1 – Full rebuild with enhancements
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
 import {
   Home, UserCircle, Plus, X, Search, Lock, List, BarChart2,
   CreditCard, Wallet, Smartphone, Coins, ChevronLeft, ArrowUp, ArrowDown,
-  Pencil, Trash2, Camera, Bell, Shield, Download, Upload, AlertTriangle,
+  Pencil, Trash2, Camera, Shield, Download, Upload, AlertTriangle,
   Check, Volume2, VolumeX, Coffee, ShoppingCart, ShoppingBag, Car, Zap,
   Heart, BookOpen, Scissors, Briefcase, Gift, TrendingUp, MoreHorizontal,
-  DollarSign, Monitor, Eye, EyeOff, ArrowDownLeft, ArrowUpRight,
-  PiggyBank, Receipt, Star, Sliders, RefreshCw, ChevronRight, Banknote
+  Monitor, Eye, EyeOff, ArrowDownLeft, ArrowUpRight,
+  PiggyBank, Receipt, Star, Sliders, ExternalLink
 } from "lucide-react";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
@@ -53,13 +53,30 @@ const detectBrand = name => {
 const getAccGrad = (acc, idx = 0) =>
   acc.customGrad || detectBrand(acc.name) || DEFAULT_GRADS[idx % DEFAULT_GRADS.length];
 
+// App Deep Links
+const getAppLink = name => {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes('bca')) return 'bca://';
+  if (n.includes('mandiri')) return 'byond://'; // New Mandiri Byond
+  if (n.includes('bri')) return 'brimo://';
+  if (n.includes('bni')) return 'bni://';
+  if (n.includes('go') || n.includes('gopay')) return 'gojek://';
+  if (n.includes('ovo')) return 'ovo://';
+  if (n.includes('dana')) return 'dana://';
+  if (n.includes('shopee')) return 'shopeeid://';
+  if (n.includes('jago')) return 'jago://';
+  if (n.includes('jenius')) return 'jenius://';
+  return null;
+};
+
 // ─── CATEGORY CONFIG ──────────────────────────────────────────────────────────
 const SMART_RULES = [
   { kw: ["indomaret","alfamart","lawson","minimarket","superindo","giant","hypermart","carrefour","transmart"], cat: "Belanja Harian" },
   { kw: ["gofood","grabfood","shopeefood","kfc","mcdonalds","burger","pizza","starbucks","kopi","bakso","warteg","makan","resto","cafe","coffee","padang","nasi"], cat: "Makan & Minum" },
   { kw: ["tokopedia","shopee","lazada","bukalapak","blibli","tiktok shop","zalora","uniqlo","zara"], cat: "Belanja Online" },
   { kw: ["grab","gojek","ojek","maxim","busway","transjakarta","kereta","mrt","lrt","bensin","pertamina","shell","parkir","tol"], cat: "Transportasi" },
-  { kw: ["netflix","spotify","youtube","disney","vidio","game","bioskop","cinema","cgv"], cat: "Hiburan" },
+  { kw: ["netflix","spotify","youtube","disney","vidio","game","bioskop","cinema","cgv","xxi"], cat: "Hiburan" },
   { kw: ["pln","listrik","pdam","internet","wifi","indihome","telkom","xl","telkomsel","pulsa","token"], cat: "Tagihan" },
   { kw: ["apotek","klinik","dokter","rumah sakit","bpjs","obat","vitamin","halodoc"], cat: "Kesehatan" },
   { kw: ["sekolah","kuliah","les","kursus","buku","gramedia"], cat: "Pendidikan" },
@@ -69,9 +86,10 @@ const SMART_RULES = [
   { kw: ["freelance","project","proyek","honor","fee","jasa"], cat: "Freelance" },
   { kw: ["transfer","kiriman","hadiah","kado"], cat: "Hadiah" },
   { kw: ["investasi","saham","reksa","deposito","dividen","bunga"], cat: "Investasi" },
+  { kw: ["penyesuaian","saldo","koreksi"], cat: "Penyesuaian Saldo" }
 ];
 const CATS_EXP = ["Makan & Minum","Belanja Harian","Belanja Online","Transportasi","Hiburan","Tagihan","Kesehatan","Pendidikan","Tempat Tinggal","Perawatan","Lainnya"];
-const CATS_INC = ["Gaji","Freelance","Hadiah","Investasi","Lainnya"];
+const CATS_INC = ["Gaji","Freelance","Hadiah","Investasi","Lainnya","Penyesuaian Saldo"];
 const CAT_ICON = (cat, sz = 16, col = "currentColor") => {
   const p = { size: sz, strokeWidth: 1.7, color: col };
   return ({ "Makan & Minum":<Coffee {...p}/>, "Belanja Harian":<ShoppingCart {...p}/>, "Belanja Online":<ShoppingBag {...p}/>,
@@ -82,14 +100,14 @@ const CAT_ICON = (cat, sz = 16, col = "currentColor") => {
     "Penyesuaian Saldo":<Sliders {...p}/> })[cat] || <MoreHorizontal {...p}/>;
 };
 const CAT_COLORS = { "Makan & Minum":"#ef4444","Belanja Harian":"#f97316","Belanja Online":"#ec4899","Transportasi":"#3b82f6","Hiburan":"#f59e0b","Tagihan":"#8b5cf6","Kesehatan":"#10b981","Pendidikan":"#06b6d4","Tempat Tinggal":"#6366f1","Perawatan":"#f472b6","Gaji":"#22c55e","Freelance":"#84cc16","Hadiah":"#a78bfa","Investasi":"#34d399","Lainnya":"#9ca3af","Penyesuaian Saldo":"#9ca3af" };
-const CAT_BG    = { "Makan & Minum":"#fee2e2","Belanja Harian":"#ffedd5","Belanja Online":"#fce7f3","Transportasi":"#dbeafe","Hiburan":"#fef3c7","Tagihan":"#ede9fe","Kesehatan":"#d1fae5","Pendidikan":"#cffafe","Tempat Tinggal":"#e0e7ff","Perawatan":"#fce7f3","Gaji":"#dcfce7","Freelance":"#ecfccb","Hadiah":"#ede9fe","Investasi":"#d1fae5","Lainnya":"#f3f4f6","Penyesuaian Saldo":"#f3f4f6" };
+const CAT_BG    = { "Makan & Minum":"#fee2e2","Belanja Harian":"#ffedd5","Belanja Online":"#fce7f3","Transportasi":"#dbeafe","Hiburan":"#fef3c7","Tagihan":"#ede9fe","Kesehatan":"#d1fae5","Pendidikan":"#cffafe","Tempat Tinggal":"#e0e7ff","Perawatan":"#fce7f3","Gaji":"#dcfce7","Freelance":"#ecfccb","Hadiah":"#ede9fe","Investasi":"#d1fae5","Lainnya":"#f3f4f6","Penyesuaian Saldo":"#e5e7eb" };
 
 const ACC_TYPES = [
-  { type:"cash",    label:"Dompet / Tunai", Icon: ({s=18})=><Wallet size={s} strokeWidth={1.7}/>,    grad:"linear-gradient(135deg,#b45309,#f59e0b)" },
-  { type:"debit",   label:"Rekening Debit", Icon: ({s=18})=><CreditCard size={s} strokeWidth={1.7}/>, grad:"linear-gradient(135deg,#1d4ed8,#60a5fa)" },
-  { type:"credit",  label:"Kartu Kredit",   Icon: ({s=18})=><CreditCard size={s} strokeWidth={1.7}/>, grad:"linear-gradient(135deg,#7c3aed,#c084fc)" },
-  { type:"ewallet", label:"E-Wallet",        Icon: ({s=18})=><Smartphone size={s} strokeWidth={1.7}/>,grad:"linear-gradient(135deg,#0e9f6e,#34d399)" },
-  { type:"emoney",  label:"E-Money",         Icon: ({s=18})=><Coins size={s} strokeWidth={1.7}/>,     grad:"linear-gradient(135deg,#b45309,#fb923c)" },
+  { type:"cash",    label:"Dompet / Tunai", Icon: ({s=18})=><Wallet size={s} strokeWidth={1.7}/> },
+  { type:"debit",   label:"Rekening Debit", Icon: ({s=18})=><CreditCard size={s} strokeWidth={1.7}/> },
+  { type:"credit",  label:"Kartu Kredit",   Icon: ({s=18})=><CreditCard size={s} strokeWidth={1.7}/> },
+  { type:"ewallet", label:"E-Wallet",       Icon: ({s=18})=><Smartphone size={s} strokeWidth={1.7}/> },
+  { type:"emoney",  label:"E-Money",        Icon: ({s=18})=><Coins size={s} strokeWidth={1.7}/> },
 ];
 const EWALLETS = ["GoPay","OVO","DANA","ShopeePay","LinkAja","Blu","Jago","SeaBank","Lainnya"];
 const EMONEYS  = ["Flazz BCA","e-money Mandiri","Brizzi BRI","TapCash BNI","Lainnya"];
@@ -120,52 +138,31 @@ const labelDate = s => {
 const fmtNum  = raw => { const n = parseInt((raw||"").replace(/\D/g,"")||"0"); return n ? n.toLocaleString("id-ID") : ""; };
 const parseNum = str => parseInt((str||"").replace(/\./g,"").replace(/,/g,"") || "0");
 
+const getCurrentDateTopStr = () => {
+  return new Date().toLocaleDateString("en-GB", { weekday: 'short', day: '2-digit', month: 'short', year: '2-digit' });
+};
+
 // localStorage
 const lsGet = (k,def) => { try { const v=localStorage.getItem(k); return v!=null?JSON.parse(v):def; } catch { return def; } };
 const lsSet = (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} };
 
-// IndexedDB for attachment blobs (avoids localStorage size limit)
+// IndexedDB
 const IDB = {
   _db: null,
   open() {
     if (this._db) return Promise.resolve(this._db);
     return new Promise((res,rej) => {
       const req = indexedDB.open("dompetku_v6", 1);
-      req.onupgradeneeded = e => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains("blobs")) db.createObjectStore("blobs");
-      };
+      req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains("blobs")) e.target.result.createObjectStore("blobs"); };
       req.onsuccess = e => { this._db = e.target.result; res(this._db); };
       req.onerror = () => rej(req.error);
     });
   },
-  async put(key, val) {
-    const db = await this.open();
-    return new Promise((res,rej) => {
-      const tx = db.transaction("blobs","readwrite");
-      tx.objectStore("blobs").put(val,key);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-  },
-  async get(key) {
-    const db = await this.open();
-    return new Promise((res,rej) => {
-      const tx = db.transaction("blobs","readonly");
-      const req = tx.objectStore("blobs").get(key);
-      req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error);
-    });
-  },
-  async del(key) {
-    const db = await this.open();
-    return new Promise((res,rej) => {
-      const tx = db.transaction("blobs","readwrite");
-      tx.objectStore("blobs").delete(key);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-  },
+  async put(key, val) { const db = await this.open(); return new Promise((res,rej) => { const tx = db.transaction("blobs","readwrite"); tx.objectStore("blobs").put(val,key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); },
+  async get(key) { const db = await this.open(); return new Promise((res,rej) => { const tx = db.transaction("blobs","readonly"); const req = tx.objectStore("blobs").get(key); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); },
+  async del(key) { const db = await this.open(); return new Promise((res,rej) => { const tx = db.transaction("blobs","readwrite"); tx.objectStore("blobs").delete(key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); },
 };
 
-// PIN hashing via Web Crypto (SHA-256 + salt)
 const hashPin = async pin => {
   try {
     const data = new TextEncoder().encode("dompetku_2025:" + pin);
@@ -174,21 +171,14 @@ const hashPin = async pin => {
   } catch { return pin; }
 };
 
-// Sound effects (Web Audio API)
 const playTxnSound = type => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator(); const gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination); osc.type = "sine";
-    if (type === "expense") {
-      osc.frequency.setValueAtTime(523, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(262, ctx.currentTime + 0.35);
-    } else {
-      osc.frequency.setValueAtTime(330, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.35);
-    }
-    gain.gain.setValueAtTime(0.22, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    if (type === "expense") { osc.frequency.setValueAtTime(523, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(262, ctx.currentTime + 0.35); } 
+    else { osc.frequency.setValueAtTime(330, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.35); }
+    gain.gain.setValueAtTime(0.22, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
   } catch {}
 };
@@ -196,13 +186,9 @@ const playTxnSound = type => {
 // ─── DOMPETKU LOGO SVG ────────────────────────────────────────────────────────
 const DompetKuLogo = ({ size = 28, color = "#fff" }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    {/* Wallet body */}
     <rect x="2" y="9" width="21" height="15" rx="3.5" stroke={color} strokeWidth="2"/>
-    {/* Card slot */}
     <path d="M15 14h8a2 2 0 010 4h-8" stroke={color} strokeWidth="1.9" fill="none"/>
-    {/* Dot on card */}
     <circle cx="19.5" cy="16" r="1.4" fill={color}/>
-    {/* Hand fingers reaching from right */}
     <path d="M24 21.5 C27 19.5 29.5 17 29 14" stroke={color} strokeWidth="2" strokeLinecap="round"/>
     <path d="M24.5 18 C27 16 29 13.5 28.5 11" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
     <path d="M24 14.5 C26 12.5 27 10 26 8.5" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
@@ -210,7 +196,7 @@ const DompetKuLogo = ({ size = 28, color = "#fff" }) => (
 );
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
-const Card    = ({children,style={}}) => <div style={{background:"#fff",borderRadius:18,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:12,...style}}>{children}</div>;
+const Card    = ({children,style={},onClick}) => <div onClick={onClick} style={{background:"#fff",borderRadius:18,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:12,...style}}>{children}</div>;
 const Row     = ({children,style={}}) => <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",...style}}>{children}</div>;
 const BtnG    = ({onClick,children,style={},disabled=false}) => <button onClick={onClick} disabled={disabled} style={{width:"100%",padding:"15px",background:disabled?"#d1d5db":G,border:"none",borderRadius:16,color:"#fff",fontSize:15,fontWeight:700,cursor:disabled?"not-allowed":"pointer",boxShadow:disabled?"none":`0 6px 20px ${G}40`,...style}}>{children}</button>;
 const Inp     = ({label,children,mb=10,style={}}) => <div style={{background:"#fff",borderRadius:14,padding:"12px 14px",marginBottom:mb,boxShadow:"0 1px 4px rgba(0,0,0,0.05)",...style}}>{label&&<p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700,letterSpacing:.6}}>{label}</p>}{children}</div>;
@@ -253,8 +239,7 @@ function PinScreen({ mode="unlock", savedHash, onUnlock, onSetPin, onCancel }) {
     if (busy || input.length >= 6) return;
     const next = input + d; setInput(next); setErr("");
     if (mode === "unlock" && next.length === 4) {
-      setBusy(true);
-      const h = await hashPin(next); setBusy(false);
+      setBusy(true); const h = await hashPin(next); setBusy(false);
       if (h === savedHash) { setInput(""); onUnlock(); }
       else { setErr("PIN salah. Coba lagi."); setTimeout(() => setInput(""), 400); }
     }
@@ -269,21 +254,13 @@ function PinScreen({ mode="unlock", savedHash, onUnlock, onSetPin, onCancel }) {
     <div style={{position:"fixed",inset:0,background:"#fff",zIndex:999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",maxWidth:430,margin:"0 auto"}}>
       <div style={{width:64,height:64,borderRadius:20,background:`linear-gradient(135deg,${G},${G2})`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><DompetKuLogo size={32}/></div>
       <p style={{fontSize:19,fontWeight:800,color:"#111",margin:"0 0 4px"}}>DompetKu</p>
-      <p style={{fontSize:13,color:"#9ca3af",margin:"0 0 24px",textAlign:"center",padding:"0 24px"}}>
-        {mode==="set" ? (step===1?"Buat PIN baru (4 digit)":"Konfirmasi PIN kamu") : "Masukkan PIN untuk membuka"}
-      </p>
-      <div style={{display:"flex",gap:14,marginBottom:8}}>
-        {[0,1,2,3].map(i => <div key={i} style={{width:14,height:14,borderRadius:"50%",background:input.length>i?G:"#e5e7eb",transition:"background .15s"}}/>)}
-      </div>
+      <p style={{fontSize:13,color:"#9ca3af",margin:"0 0 24px",textAlign:"center",padding:"0 24px"}}>{mode==="set" ? (step===1?"Buat PIN baru (4 digit)":"Konfirmasi PIN kamu") : "Masukkan PIN untuk membuka"}</p>
+      <div style={{display:"flex",gap:14,marginBottom:8}}>{[0,1,2,3].map(i => <div key={i} style={{width:14,height:14,borderRadius:"50%",background:input.length>i?G:"#e5e7eb",transition:"background .15s"}}/>)}</div>
       {err && <p style={{color:"#ef4444",fontSize:12,margin:"4px 0 0"}}>{err}</p>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,72px)",gap:10,marginTop:20}}>
         {[1,2,3,4,5,6,7,8,9,"","0","del"].map(d => (
           <button key={d} onClick={()=>d==="del"?setInput(p=>p.slice(0,-1)):d!==""&&press(String(d))}
-            style={{height:68,borderRadius:18,background:d===""?"transparent":d==="del"?"#f1f5f9":"#f8fafc",border:"none",
-              fontSize:22,fontWeight:700,color:"#111",cursor:d===""?"default":"pointer",
-              boxShadow:d===""||d==="del"?"none":"0 1px 4px rgba(0,0,0,0.07)",display:"flex",alignItems:"center",justifyContent:"center"}}
-            onMouseDown={e=>{if(d)e.currentTarget.style.transform="scale(0.9)"}}
-            onMouseUp={e=>e.currentTarget.style.transform=""}>
+            style={{height:68,borderRadius:18,background:d===""?"transparent":d==="del"?"#f1f5f9":"#f8fafc",border:"none",fontSize:22,fontWeight:700,color:"#111",cursor:d===""?"default":"pointer",boxShadow:d===""||d==="del"?"none":"0 1px 4px rgba(0,0,0,0.07)",display:"flex",alignItems:"center",justifyContent:"center"}}>
             {d==="del"?<Trash2 size={17} strokeWidth={1.7} color="#6b7280"/>:d}
           </button>
         ))}
@@ -294,14 +271,14 @@ function PinScreen({ mode="unlock", savedHash, onUnlock, onSetPin, onCancel }) {
 }
 
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
-const SLIDES = [
-  { title:"Selamat Datang\ndi DompetKu", sub:"Catat, kelola, dan analisis\nkeuangan pribadi kamu dengan mudah.", icon:<PiggyBank size={76} strokeWidth={1.2} color={G}/> },
-  { title:"Lacak Setiap\nRupiah",        sub:"Kategorisasi otomatis, lampirkan struk,\ndan lihat grafik keuanganmu.", icon:<BarChart2 size={76} strokeWidth={1.2} color={G}/> },
-  { title:"Privat &\nAman",              sub:"Data tersimpan hanya di perangkatmu.\nDilindungi PIN agar tidak ada yang mengintip.", icon:<Shield size={76} strokeWidth={1.2} color={G}/> },
-];
 function OnboardingScreen({ onDone }) {
   const [slide, setSlide] = useState(0);
   const [name, setName]   = useState("");
+  const SLIDES = [
+    { title:"Selamat Datang\ndi DompetKu", sub:"Catat, kelola, dan analisis\nkeuangan pribadi kamu dengan mudah.", icon:<PiggyBank size={76} strokeWidth={1.2} color={G}/> },
+    { title:"Lacak Setiap\nRupiah",        sub:"Kategorisasi otomatis, lampirkan struk,\ndan lihat grafik keuanganmu.", icon:<BarChart2 size={76} strokeWidth={1.2} color={G}/> },
+    { title:"Privat &\nAman",              sub:"Data tersimpan hanya di perangkatmu.\nDilindungi PIN agar tidak ada yang mengintip.", icon:<Shield size={76} strokeWidth={1.2} color={G}/> },
+  ];
   const last = slide === SLIDES.length - 1;
   const next = () => { if (last) { if (!name.trim()) return; onDone(name.trim()); } else setSlide(s => s+1); };
   return (
@@ -328,9 +305,9 @@ function OnboardingScreen({ onDone }) {
 }
 
 // ─── SMART BUDGET MODAL ───────────────────────────────────────────────────────
-function BudgetModal({ totalBalance, currentBudget, onApply, onClose }) {
+function BudgetModal({ totalBalance, currentBudget, targetTabungan, setTargetTabungan, onApply, onClose }) {
   const daysLeft   = daysLeftMonth();
-  const [savePct, setSavePct]     = useState(20);
+  const [savePct, setSavePct]     = useState(targetTabungan || 20);
   const [custom, setCustom]       = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const saving      = Math.round(totalBalance * savePct / 100);
@@ -345,73 +322,55 @@ function BudgetModal({ totalBalance, currentBudget, onApply, onClose }) {
         <p style={{color:"#fff",fontSize:22,fontWeight:800,margin:"0 0 10px"}}>{fmt(totalBalance)}</p>
         <Row><span style={{color:"rgba(255,255,255,0.8)",fontSize:12}}>Sisa hari bulan ini</span><span style={{color:"#fff",fontWeight:700,fontSize:13}}>{daysLeft} hari</span></Row>
       </Card>
-
       <Card style={{marginBottom:12}}>
         <Row style={{marginBottom:10}}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:"#111"}}>Target Tabungan</p>
           <span style={{fontSize:16,fontWeight:800,color:G}}>{savePct}%</span>
         </Row>
-        <input type="range" min={0} max={70} step={5} value={savePct} onChange={e=>setSavePct(Number(e.target.value))}
-          style={{width:"100%",accentColor:G,cursor:"pointer"}}/>
+        <input type="range" min={0} max={70} step={5} value={savePct} onChange={e=>setSavePct(Number(e.target.value))} style={{width:"100%",accentColor:G,cursor:"pointer"}}/>
         <Row style={{marginTop:8}}>
-          <span style={{fontSize:11,color:"#9ca3af"}}>0%</span>
-          <span style={{fontSize:11,color:"#9ca3af"}}>70%</span>
+          <span style={{fontSize:11,color:"#9ca3af"}}>0%</span><span style={{fontSize:11,color:"#9ca3af"}}>70%</span>
         </Row>
       </Card>
-
       <Card style={{marginBottom:14}}>
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#9ca3af",letterSpacing:.5}}>ANALISIS REKOMENDASI</p>
-        {[
-          { label:"Ditabung", val:saving, col:"#8b5cf6" },
-          { label:"Bisa Dibelanjakan", val:spendable, col:G },
-          { label:"Budget Bulanan Ideal", val:sugBudget, col:G, bold:true },
-          { label:"Limit Harian Ideal", val:sugDaily, col:"#f97316" },
-        ].map(r => (
-          <Row key={r.label} style={{paddingVertical:4,marginBottom:6}}>
-            <span style={{fontSize:12,color:"#6b7280"}}>{r.label}</span>
-            <span style={{fontSize:r.bold?14:12,fontWeight:r.bold?800:700,color:r.col}}>{fmt(r.val)}</span>
-          </Row>
+        {[{ label:"Ditabung", val:saving, col:"#8b5cf6" },{ label:"Bisa Dibelanjakan", val:spendable, col:G },{ label:"Budget Bulanan Ideal", val:sugBudget, col:G, bold:true },{ label:"Limit Harian Ideal", val:sugDaily, col:"#f97316" }].map(r => (
+          <Row key={r.label} style={{paddingVertical:4,marginBottom:6}}><span style={{fontSize:12,color:"#6b7280"}}>{r.label}</span><span style={{fontSize:r.bold?14:12,fontWeight:r.bold?800:700,color:r.col}}>{fmt(r.val)}</span></Row>
         ))}
       </Card>
-
       <Inp label="ATAU MASUKKAN NOMINAL SENDIRI" mb={18}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <input type="checkbox" checked={useCustom} onChange={e=>setUseCustom(e.target.checked)} style={{accentColor:G,width:16,height:16}}/>
-          <span style={{fontSize:12,color:"#6b7280",flex:1}}>Pakai nominal kustom</span>
-        </div>
-        {useCustom && (
-          <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontSize:14,color:"#9ca3af",fontWeight:600}}>Rp</span>
-            <input inputMode="numeric" value={custom} onChange={e=>setCustom(fmtNum(e.target.value))} placeholder="0"
-              style={{flex:1,border:"none",outline:"none",fontSize:18,fontWeight:800,color:"#111",background:"transparent"}}/>
-          </div>
-        )}
+        <div style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={useCustom} onChange={e=>setUseCustom(e.target.checked)} style={{accentColor:G,width:16,height:16}}/><span style={{fontSize:12,color:"#6b7280",flex:1}}>Pakai nominal kustom</span></div>
+        {useCustom && (<div style={{marginTop:8,display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:14,color:"#9ca3af",fontWeight:600}}>Rp</span><input inputMode="numeric" value={custom} onChange={e=>setCustom(fmtNum(e.target.value))} placeholder="0" style={{flex:1,border:"none",outline:"none",fontSize:18,fontWeight:800,color:"#111",background:"transparent"}}/></div>)}
       </Inp>
-
-      <BtnG onClick={()=>onApply(finalBudget)} disabled={finalBudget<=0}>Terapkan Budget: {fmt(finalBudget)}</BtnG>
+      <BtnG onClick={()=>{ setTargetTabungan(savePct); onApply(finalBudget); }} disabled={finalBudget<=0}>Terapkan Budget: {fmt(finalBudget)}</BtnG>
     </BottomSheet>
   );
 }
 
 // ─── ACCOUNT MODAL ────────────────────────────────────────────────────────────
 function AccountModal({ initial, onClose, onSave, isNew }) {
-  const [acc, setAcc]         = useState(initial || { type:"debit", name:"", last4:"", customGrad:"" });
+  const [acc, setAcc]         = useState(initial || { type:"debit", name:"", last4:"", customGrad:"", balance: 0 });
   const [showCustom, setShowCustom] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [c1, setC1] = useState(initial?.customGrad ? initial.customGrad.split(",")[1].trim() : "#2DAB7F");
+  const [c2, setC2] = useState(initial?.customGrad ? initial.customGrad.split(",")[2].replace(")","").trim() : "#1d8a63");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const iconRef = useRef();
+  
   const s = (k,v) => setAcc(a=>({...a,[k]:v}));
-
   const handleSelect = v => { if(v==="Lainnya"){setShowCustom(true);s("name","");}else{setShowCustom(false);s("name",v);} };
   const finalName    = showCustom ? customName : acc.name;
   const opts         = acc.type==="ewallet"?EWALLETS:acc.type==="emoney"?EMONEYS:acc.type==="cash"?null:BANKS;
   const detectedGrad = detectBrand(finalName);
 
+  const applyCustomColor = () => { s("customGrad", `linear-gradient(135deg, ${c1}, ${c2})`); };
+
   const submit = () => {
     if (!finalName || (!isNew && !initial)) return;
     const data = { ...acc, name: finalName };
     if (!data.customGrad && detectedGrad) data.customGrad = detectedGrad;
-    onSave(data);
+    const diff = data.balance - (initial?.balance || 0);
+    onSave(data, isNew ? 0 : diff);
   };
 
   const handleIcon = e => {
@@ -429,7 +388,6 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
           </button>
         ))}
       </div>
-
       <Inp label={acc.type==="ewallet"?"E-WALLET":acc.type==="emoney"?"E-MONEY":acc.type==="cash"?"NAMA":"BANK"} mb={showCustom?6:10}>
         {acc.type==="cash"
           ? <input value={acc.name} onChange={e=>s("name",e.target.value)} placeholder="cth: Dompet Harian" style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/>
@@ -438,57 +396,42 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
             </select>}
       </Inp>
       {showCustom && <Inp label="NAMA MANUAL" mb={10}><input value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="cth: Bank Anda, GoPay Bisnis..." style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/></Inp>}
-
       <Inp label="4 DIGIT TERAKHIR (OPSIONAL)" mb={10}>
         <input value={acc.last4||""} onChange={e=>s("last4",e.target.value.slice(0,4))} placeholder="xxxx" maxLength={4} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/>
       </Inp>
-
-      {/* Color & visual override */}
       <Card style={{marginBottom:14,padding:"12px 14px"}}>
         <p style={{margin:"0 0 10px",fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:.5}}>TAMPILAN KARTU</p>
-        {detectedGrad && <div style={{background:GL,borderRadius:9,padding:"7px 11px",marginBottom:8,display:"flex",alignItems:"center",gap:7}}><Check size={13} color={G}/><span style={{fontSize:11,color:G,fontWeight:600}}>Brand {finalName} terdeteksi otomatis</span></div>}
+        {detectedGrad && <div style={{background:GL,borderRadius:9,padding:"7px 11px",marginBottom:8,display:"flex",alignItems:"center",gap:7}}><Check size={13} color={G}/><span style={{fontSize:11,color:G,fontWeight:600}}>Brand {finalName} terdeteksi</span></div>}
         <Row style={{marginBottom:8}}>
-          <span style={{fontSize:12,color:"#6b7280"}}>Warna kustom</span>
-          <button onClick={()=>setShowColorPicker(p=>!p)} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>{showColorPicker?"Tutup":"Pilih"}</button>
+          <span style={{fontSize:12,color:"#6b7280"}}>Warna kustom & Ikon</span>
+          <button onClick={()=>setShowColorPicker(p=>!p)} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>{showColorPicker?"Tutup":"Edit"}</button>
         </Row>
         {showColorPicker && (
-          <div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-              {SWATCH.map(c => (
-                <div key={c} onClick={()=>s("customGrad",`linear-gradient(135deg,${c},${c}dd)`)}
-                  style={{width:28,height:28,borderRadius:8,background:c,cursor:"pointer",border:acc.customGrad?.includes(c)?"2px solid #fff":"2px solid transparent",boxShadow:acc.customGrad?.includes(c)?"0 0 0 2px "+c:"none"}}/>
-              ))}
-              <div onClick={()=>s("customGrad","")} style={{width:28,height:28,borderRadius:8,background:"linear-gradient(135deg,#374151,#6b7280)",cursor:"pointer",border:"1.5px dashed #9ca3af"}}/>
+          <div style={{background:"#f8fafc", padding:10, borderRadius:12, marginBottom:10}}>
+            <p style={{fontSize:11, color:"#6b7280", margin:"0 0 6px"}}>Warna Gradien (2 warna)</p>
+            <div style={{display:"flex", gap:8, marginBottom:12}}>
+              <input type="color" value={c1} onChange={e=>{setC1(e.target.value); applyCustomColor();}} style={{width:36,height:36,border:"none",padding:0,borderRadius:8,cursor:"pointer"}} />
+              <input type="color" value={c2} onChange={e=>{setC2(e.target.value); applyCustomColor();}} style={{width:36,height:36,border:"none",padding:0,borderRadius:8,cursor:"pointer"}} />
             </div>
             <Row>
-              <span style={{fontSize:12,color:"#6b7280"}}>Ikon kustom (gambar)</span>
+              <span style={{fontSize:11,color:"#6b7280"}}>Ikon Gambar</span>
               <button onClick={()=>iconRef.current.click()} style={{background:GL,border:"none",borderRadius:9,padding:"5px 10px",color:G,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><Upload size={12}/> Upload</button>
             </Row>
             <input ref={iconRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleIcon}/>
           </div>
         )}
-        {/* Preview card */}
         <div style={{background:acc.customGrad||detectedGrad||DEFAULT_GRADS[0],borderRadius:12,padding:"12px",marginTop:8}}>
           <p style={{color:"rgba(255,255,255,0.8)",fontSize:11,margin:"0 0 3px"}}>{finalName||"Nama Akun"}</p>
-          <p style={{color:"#fff",fontSize:14,fontWeight:800,margin:0}}>Rp 0</p>
+          <p style={{color:"#fff",fontSize:14,fontWeight:800,margin:0}}>{fmt(acc.balance || 0)}</p>
         </div>
       </Card>
-
-      {/* Saldo awal (only for new accounts) */}
-      {isNew && <Inp label="SALDO AWAL (RP)" mb={14}>
+      <Inp label={isNew ? "SALDO AWAL (RP)" : "SALDO SAAT INI (RP)"} mb={14}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span>
-          <input inputMode="numeric" placeholder="0" value={fmtNum(String(acc.balance||""))}
-            onChange={e=>s("balance",parseNum(e.target.value))}
-            style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:22,fontWeight:800,color:"#111"}}/>
+          <input inputMode="numeric" placeholder="0" value={fmtNum(String(acc.balance||""))} onChange={e=>s("balance",parseNum(e.target.value))} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:22,fontWeight:800,color:"#111"}}/>
         </div>
-      </Inp>}
-
-      {/* Balance adjustment for existing accounts */}
-      {!isNew && <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px dashed #e5e7eb"}}>
-        <p style={{margin:0,fontSize:12,color:"#9ca3af",lineHeight:1.5}}>💡 Untuk mengubah saldo, gunakan fitur <b>"Catat Transaksi"</b> dengan kategori <b>Penyesuaian Saldo</b> agar riwayat tetap akurat.</p>
-      </div>}
-
+      </Inp>
+      {!isNew && <p style={{fontSize:11, color:"#9ca3af", margin:"-6px 0 14px 4px", lineHeight:1.4}}>Jika saldo diubah, selisih otomatis tercatat sebagai <b>Penyesuaian Saldo</b>.</p>}
       <BtnG onClick={submit} disabled={!finalName}>{isNew?"Tambah Akun":"Simpan Perubahan"}</BtnG>
     </BottomSheet>
   );
@@ -498,19 +441,19 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
 function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingFile }) {
   const isEdit = !!initial;
   const [form, setForm] = useState(() => initial || {
-    type:"expense", amountStr:"", category:"Makan & Minum",
-    note:"", date:todayStr(), accountId:accounts[0]?.id, attachmentMeta:[]
+    type:"expense", amountStr:"", category:"Makan & Minum", note:"", date:todayStr(), 
+    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}),
+    accountId:accounts[0]?.id, attachmentMeta:[], meta: {}
   });
   const [detected, setDetected] = useState(null);
   const fileRef = useRef();
+  
   const s = (k,v) => setForm(f=>({...f,[k]:v}));
-
   const handleNote = v => { s("note",v); const d=smartDetect(v); setDetected(d); if(d)setForm(f=>({...f,note:v,category:d.cat})); };
   const handleAmt  = e => { const raw=e.target.value.replace(/\D/g,""); s("amountStr",raw?parseInt(raw).toLocaleString("id-ID"):""); };
   const handleFile = async e => {
-    isPickingFile.current = false; // reset after picking
-    const files = Array.from(e.target.files);
-    const newMeta = [];
+    isPickingFile.current = false;
+    const files = Array.from(e.target.files); const newMeta = [];
     for (const f of files) {
       const id = `att_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const data = await new Promise(res => { const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(f); });
@@ -519,11 +462,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
     }
     setForm(f=>({...f, attachmentMeta:[...(f.attachmentMeta||[]),...newMeta]}));
   };
-  const removeAttachment = async (id) => {
-    await IDB.del(id).catch(()=>{});
-    setForm(f=>({...f,attachmentMeta:(f.attachmentMeta||[]).filter(a=>a.id!==id)}));
-  };
-
+  const removeAttachment = async (id) => { await IDB.del(id).catch(()=>{}); setForm(f=>({...f,attachmentMeta:(f.attachmentMeta||[]).filter(a=>a.id!==id)})); };
   const submit = () => {
     const amount = parseNum(form.amountStr || "0");
     if (!amount || !form.accountId) return;
@@ -532,70 +471,62 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
   };
 
   const cats = form.type === "expense" ? CATS_EXP : CATS_INC;
+  const noteL = (form.note || "").toLowerCase();
+  const isTransjakarta = noteL.includes("transjakarta") || noteL.includes("busway");
+  const isMRT = noteL.includes("mrt");
+  const isBioskop = noteL.includes("bioskop") || noteL.includes("cgv") || noteL.includes("xxi");
+
   return (
     <BottomSheet onClose={onClose} title={isEdit?"Edit Transaksi":"Catat Transaksi"}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,marginBottom:14,background:"#e5e7eb",borderRadius:14,padding:4}}>
         {["expense","income"].map(type => (
-          <button key={type} onClick={()=>setForm(f=>({...f,type,category:type==="expense"?"Makan & Minum":"Gaji"}))}
-            style={{padding:"10px",border:"none",borderRadius:11,background:form.type===type?"#fff":"transparent",color:form.type===type?"#111":"#9ca3af",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:form.type===type?"0 1px 4px rgba(0,0,0,0.08)":"none"}}>
-            {type==="expense"?"Pengeluaran":"Pemasukan"}
-          </button>
+          <button key={type} onClick={()=>setForm(f=>({...f,type,category:type==="expense"?"Makan & Minum":"Gaji"}))} style={{padding:"10px",border:"none",borderRadius:11,background:form.type===type?"#fff":"transparent",color:form.type===type?"#111":"#9ca3af",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:form.type===type?"0 1px 4px rgba(0,0,0,0.08)":"none"}}>{type==="expense"?"Pengeluaran":"Pemasukan"}</button>
         ))}
       </div>
       <Inp label="JUMLAH (RP)">
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span>
-          <input inputMode="numeric" placeholder="0" value={form.amountStr||""}
-            onChange={handleAmt} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:28,fontWeight:800,color:"#111"}}/>
-        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span><input inputMode="numeric" placeholder="0" value={form.amountStr||""} onChange={handleAmt} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:28,fontWeight:800,color:"#111"}}/></div>
       </Inp>
-      <Inp label="CATATAN / NAMA TOKO" mb={detected?6:10}>
-        <input placeholder="cth: Indomaret, GoFood..." value={form.note||""} onChange={e=>handleNote(e.target.value)}
-          style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/>
-      </Inp>
+      <Inp label="CATATAN / NAMA TOKO" mb={detected?6:10}><input placeholder="cth: Indomaret, GoFood..." value={form.note||""} onChange={e=>handleNote(e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/></Inp>
       {detected && <div style={{display:"flex",alignItems:"center",gap:7,padding:"8px 13px",background:GL,borderRadius:11,marginBottom:10,border:`1px solid ${GM}`}}><Check size={13} color={G}/><span style={{color:G,fontSize:12,fontWeight:600}}>Auto-detect: {detected.cat}</span></div>}
+      
+      {/* Contextual Extra Fields */}
+      {(isTransjakarta || isMRT || isBioskop) && (
+        <div style={{background:"#f8fafc", padding:12, borderRadius:12, marginBottom:10, border:"1px dashed #cbd5e1"}}>
+          <p style={{fontSize:10, fontWeight:700, color:"#64748b", margin:"0 0 8px"}}>DETAIL TAMBAHAN</p>
+          {isTransjakarta && <input placeholder="Koridor (cth: 1 Blok M - Kota)" value={form.meta?.koridor||""} onChange={e=>s("meta", {...form.meta, koridor:e.target.value})} style={{width:"100%", padding:8, borderRadius:8, border:"1px solid #e2e8f0", fontSize:13}}/>}
+          {isMRT && <div style={{display:"flex", gap:8}}>
+             <input placeholder="Stasiun Asal" value={form.meta?.mrtAsal||""} onChange={e=>s("meta", {...form.meta, mrtAsal:e.target.value})} style={{flex:1, padding:8, borderRadius:8, border:"1px solid #e2e8f0", fontSize:13}}/>
+             <input placeholder="Stasiun Tujuan" value={form.meta?.mrtTujuan||""} onChange={e=>s("meta", {...form.meta, mrtTujuan:e.target.value})} style={{flex:1, padding:8, borderRadius:8, border:"1px solid #e2e8f0", fontSize:13}}/>
+          </div>}
+          {isBioskop && <div style={{display:"flex", gap:8, flexDirection:"column"}}>
+             <input placeholder="Judul Film" value={form.meta?.film||""} onChange={e=>s("meta", {...form.meta, film:e.target.value})} style={{width:"100%", padding:8, borderRadius:8, border:"1px solid #e2e8f0", fontSize:13}}/>
+             <input placeholder="Bioskop (cth: CGV PVJ)" value={form.meta?.bioskop||""} onChange={e=>s("meta", {...form.meta, bioskop:e.target.value})} style={{width:"100%", padding:8, borderRadius:8, border:"1px solid #e2e8f0", fontSize:13}}/>
+          </div>}
+        </div>
+      )}
+
       <Inp label="KATEGORI">
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
           {cats.map(c => (
-            <button key={c} onClick={()=>s("category",c)}
-              style={{padding:"8px 4px",background:form.category===c?GL:"#f8fafc",border:`1.5px solid ${form.category===c?G:"#f1f5f9"}`,borderRadius:10,color:form.category===c?G:"#9ca3af",fontSize:9,fontWeight:600,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-              <span style={{color:form.category===c?G:CAT_COLORS[c]||"#9ca3af"}}>{CAT_ICON(c,17)}</span>
-              <span style={{textAlign:"center",lineHeight:1.2,color:form.category===c?G:"#6b7280",wordBreak:"break-word",hyphens:"auto"}}>
-                {c==="Makan & Minum"?"Makan":c==="Belanja Harian"?"B.Harian":c==="Belanja Online"?"B.Online":c==="Tempat Tinggal"?"Tempat Tgl":c.split(" ")[0]}
-              </span>
-            </button>
+            <button key={c} onClick={()=>s("category",c)} style={{padding:"8px 4px",background:form.category===c?GL:"#f8fafc",border:`1.5px solid ${form.category===c?G:"#f1f5f9"}`,borderRadius:10,color:form.category===c?G:"#9ca3af",fontSize:9,fontWeight:600,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{color:form.category===c?G:CAT_COLORS[c]||"#9ca3af"}}>{CAT_ICON(c,17)}</span><span style={{textAlign:"center",lineHeight:1.2,color:form.category===c?G:"#6b7280",wordBreak:"break-word",hyphens:"auto"}}>{c==="Makan & Minum"?"Makan":c==="Belanja Harian"?"B.Harian":c==="Belanja Online"?"B.Online":c==="Tempat Tinggal"?"Tempat Tgl":c==="Penyesuaian Saldo"?"Penyesuaian":c.split(" ")[0]}</span></button>
           ))}
         </div>
       </Inp>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <Inp label="AKUN" mb={0}>
-          {accounts.length === 0 ? <p style={{margin:0,fontSize:12,color:"#ef4444"}}>Buat akun dulu!</p>
-            : <select value={form.accountId} onChange={e=>s("accountId",parseInt(e.target.value))} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>
-                {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>}
-        </Inp>
-        <Inp label="TANGGAL" mb={0}>
-          <input type="date" value={form.date} onChange={e=>s("date",e.target.value)}
-            style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",colorScheme:"light"}}/>
+        <Inp label="AKUN" mb={0}>{accounts.length === 0 ? <p style={{margin:0,fontSize:12,color:"#ef4444"}}>Buat akun dulu!</p> : <select value={form.accountId} onChange={e=>s("accountId",parseInt(e.target.value))} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>}</Inp>
+        <Inp label="WAKTU & TANGGAL" mb={0}>
+          <div style={{display:"flex", gap:4}}>
+            <input type="time" value={form.time} onChange={e=>s("time",e.target.value)} style={{width:"45%",background:"transparent",border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111"}}/>
+            <input type="date" value={form.date} onChange={e=>s("date",e.target.value)} style={{width:"55%",background:"transparent",border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111"}}/>
+          </div>
         </Inp>
       </div>
       <Inp label="LAMPIRAN (OPSIONAL)" mb={18}>
-        <Row>
-          <p style={{margin:0,fontSize:12,color:"#9ca3af"}}>Foto struk, invoice, dll.</p>
-          <button onClick={()=>{isPickingFile.current=true;fileRef.current.click();}}
-            style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-            <Upload size={12}/> Tambah
-          </button>
-        </Row>
+        <Row><p style={{margin:0,fontSize:12,color:"#9ca3af"}}>Foto struk, invoice, dll.</p><button onClick={()=>{isPickingFile.current=true;fileRef.current.click();}} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Upload size={12}/> Tambah</button></Row>
         <input ref={fileRef} type="file" accept="image/*,.pdf" multiple style={{display:"none"}} onChange={handleFile}/>
         {(form.attachmentMeta||[]).length > 0 && (
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-            {form.attachmentMeta.map(a => (
-              <div key={a.id} style={{position:"relative",width:52,height:52}}>
-                <AttachPreview id={a.id} type={a.type}/>
-                <button onClick={()=>removeAttachment(a.id)} style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-              </div>
-            ))}
+            {form.attachmentMeta.map(a => (<div key={a.id} style={{position:"relative",width:52,height:52}}><AttachPreview id={a.id} type={a.type}/><button onClick={()=>removeAttachment(a.id)} style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>))}
           </div>
         )}
       </Inp>
@@ -604,7 +535,6 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
   );
 }
 
-// Small component to lazily load attachment preview from IDB
 function AttachPreview({ id, type }) {
   const [src, setSrc] = useState(null);
   useEffect(() => { IDB.get(id).then(d => d && setSrc(d)).catch(()=>{}); }, [id]);
@@ -613,35 +543,59 @@ function AttachPreview({ id, type }) {
   return <div style={{width:52,height:52,borderRadius:9,background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",color:"#6b7280"}}><Receipt size={20}/></div>;
 }
 
+// ─── TRANSACTION DETAIL MODAL ──────────────────────────────────────────────────
+function TxnDetailModal({ txn, accounts, onClose, onEdit, onDelete }) {
+  const acc = accounts.find(a => a.id === txn.accountId);
+  return (
+    <BottomSheet onClose={onClose} title="Detail Transaksi">
+       <div style={{textAlign:"center", marginBottom:20}}>
+          <CatBub cat={txn.category} size={64}/>
+          <p style={{fontSize:24, fontWeight:800, color:txn.type==="income"?G:"#ef4444", margin:"12px 0 4px"}}>{txn.type==="income"?"+":"-"} {fmt(txn.amount)}</p>
+          <p style={{fontSize:14, fontWeight:600, color:"#111", margin:0}}>{txn.note || "Transaksi"}</p>
+          <p style={{fontSize:12, color:"#9ca3af", margin:"4px 0 0"}}>{txn.date} • {txn.time||"00:00"}</p>
+       </div>
+       <Card style={{padding:"8px 16px"}}>
+          <Row style={{borderBottom:"1px solid #f8fafc", padding:"8px 0"}}><span style={{fontSize:12, color:"#6b7280"}}>Kategori</span><span style={{fontSize:13, fontWeight:600}}>{txn.category}</span></Row>
+          <Row style={{borderBottom:"1px solid #f8fafc", padding:"8px 0"}}><span style={{fontSize:12, color:"#6b7280"}}>Akun</span><span style={{fontSize:13, fontWeight:600}}>{acc?.name || "Dihapus"}</span></Row>
+          {txn.meta?.koridor && <Row style={{borderBottom:"1px solid #f8fafc", padding:"8px 0"}}><span style={{fontSize:12, color:"#6b7280"}}>Koridor</span><span style={{fontSize:13, fontWeight:600}}>{txn.meta.koridor}</span></Row>}
+          {txn.meta?.mrtAsal && <Row style={{borderBottom:"1px solid #f8fafc", padding:"8px 0"}}><span style={{fontSize:12, color:"#6b7280"}}>Rute MRT</span><span style={{fontSize:13, fontWeight:600}}>{txn.meta.mrtAsal} ➔ {txn.meta.mrtTujuan}</span></Row>}
+          {txn.meta?.film && <Row style={{borderBottom:"1px solid #f8fafc", padding:"8px 0"}}><span style={{fontSize:12, color:"#6b7280"}}>Film</span><span style={{fontSize:13, fontWeight:600}}>{txn.meta.film}</span></Row>}
+          {txn.meta?.bioskop && <Row style={{padding:"8px 0"}}><span style={{fontSize:12, color:"#6b7280"}}>Lokasi Bioskop</span><span style={{fontSize:13, fontWeight:600}}>{txn.meta.bioskop}</span></Row>}
+       </Card>
+       {(txn.attachmentMeta||[]).length > 0 && (
+         <div style={{marginBottom:14}}>
+           <p style={{fontSize:12, fontWeight:700, color:"#9ca3af", marginBottom:8}}>LAMPIRAN</p>
+           <div style={{display:"flex", gap:8}}>{txn.attachmentMeta.map(a => <AttachPreview key={a.id} id={a.id} type={a.type} />)}</div>
+         </div>
+       )}
+       <div style={{display:"flex", gap:10, marginTop:16}}>
+         <button onClick={()=>{onClose(); onEdit(txn);}} style={{flex:1, padding:"12px", borderRadius:12, border:"none", background:GL, color:G, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:6, cursor:"pointer"}}><Pencil size={14}/> Edit</button>
+         <button onClick={()=>{onClose(); onDelete(txn);}} style={{flex:1, padding:"12px", borderRadius:12, border:"none", background:"#fee2e2", color:"#ef4444", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:6, cursor:"pointer"}}><Trash2 size={14}/> Hapus</button>
+       </div>
+    </BottomSheet>
+  );
+}
+
 // ─── IMPORT MODAL ─────────────────────────────────────────────────────────────
 function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   const [st, setSt] = useState("idle"), [preview, setPreview] = useState([]), [err, setErr] = useState("");
   const ref = useRef();
   const parse = async e => {
-    isPickingFile.current = false;
-    const file = e.target.files[0]; if (!file) return;
-    if (!accounts.length) { setErr("Tambahkan akun terlebih dahulu sebelum import."); setSt("error"); return; }
-    setSt("parsing");
+    isPickingFile.current = false; const file = e.target.files[0]; if (!file) return; setSt("parsing");
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf,{type:"array"}); const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
-      if (rows.length < 2) { setErr("File kosong."); setSt("error"); return; }
-      const h = rows[0].map(x=>String(x).toLowerCase());
-      const fc = (...ns) => { for(const n of ns){const i=h.findIndex(x=>x.includes(n));if(i>=0)return i;} return -1; };
+      const buf = await file.arrayBuffer(); const wb = XLSX.read(buf,{type:"array"}); const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""}); if (rows.length < 2) { setErr("File kosong."); setSt("error"); return; }
+      const h = rows[0].map(x=>String(x).toLowerCase()); const fc = (...ns) => { for(const n of ns){const i=h.findIndex(x=>x.includes(n));if(i>=0)return i;} return -1; };
       const ai = fc("amount","jumlah","nominal"); if (ai < 0) { setErr("Kolom Amount tidak ditemukan."); setSt("error"); return; }
       const di=fc("date","tanggal"), ni=fc("note","catatan","memo"), ci=fc("category","kategori"), ti=fc("type","jenis");
       const parsed = [];
       for (let i=1; i<Math.min(rows.length,201); i++) {
         const row = rows[i]; if (!row||row.every(c=>c==="")) continue;
-        const amt = parseFloat(String(row[ai]).replace(/[^\d.-]/g,""));
-        if (!amt||isNaN(amt)) continue;
-        const rt = ti>=0?String(row[ti]).toLowerCase():"";
-        const isInc = rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
+        const amt = parseFloat(String(row[ai]).replace(/[^\d.-]/g,"")); if (!amt||isNaN(amt)) continue;
+        const rt = ti>=0?String(row[ti]).toLowerCase():""; const isInc = rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
         let pd = todayStr(); if (di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=d.toISOString().slice(0,10);}catch{}}
-        const rc = ci>=0?String(row[ci]):"";
-        const cat = Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
-        parsed.push({id:Date.now()+i,type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,accountId:accounts[0]?.id,detected:null,attachmentMeta:[]});
+        const rc = ci>=0?String(row[ci]):""; const cat = Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
+        parsed.push({id:Date.now()+i,type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"12:00",accountId:accounts[0]?.id,detected:null,attachmentMeta:[]});
       }
       if (!parsed.length){setErr("Tidak ada data valid.");setSt("error");return;}
       setPreview(parsed); setSt("preview");
@@ -664,22 +618,19 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
   const income  = txns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const expense = txns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const grad    = getAccGrad(account, accIdx);
+  const appLink = getAppLink(account.name);
   return (
     <div style={{position:"fixed",inset:0,background:BG,zIndex:150,maxWidth:430,margin:"0 auto",overflowY:"auto",paddingBottom:30}}>
       <div style={{background:grad,padding:"calc(env(safe-area-inset-top,0px) + 14px) 16px 24px",position:"relative"}}>
-        <button onClick={onClose} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}>
-          <ChevronLeft size={20}/>
-        </button>
-        <button onClick={onEditAccount} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",right:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}>
-          <Pencil size={15}/>
-        </button>
+        <button onClick={onClose} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><ChevronLeft size={20}/></button>
+        <button onClick={onEditAccount} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",right:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Pencil size={15}/></button>
         <div style={{textAlign:"center",paddingTop:16}}>
           <div style={{width:54,height:54,borderRadius:16,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",color:"#fff"}}>
             {account.iconImg ? <img src={account.iconImg} alt="" style={{width:38,height:38,borderRadius:10,objectFit:"cover"}}/> : (() => { const T=ACC_TYPES.find(t=>t.type===account.type); return T?<T.Icon s={24}/>:null; })()}
           </div>
           <p style={{color:"rgba(255,255,255,0.8)",fontSize:12,margin:"0 0 4px"}}>{account.name}</p>
           <p style={{color:"#fff",fontSize:28,fontWeight:800,margin:"0 0 14px"}}>{fmt(account.balance)}</p>
-          {account.last4 && <p style={{color:"rgba(255,255,255,0.6)",fontSize:11,letterSpacing:3}}>•••• {account.last4}</p>}
+          {appLink && <a href={appLink} style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.2)",padding:"6px 12px",borderRadius:99,color:"#fff",fontSize:11,fontWeight:700,textDecoration:"none"}}><ExternalLink size={12}/> Buka App</a>}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:16}}>
           {[{l:"Pemasukan",v:income},{l:"Pengeluaran",v:expense}].map(x=>(
@@ -711,75 +662,92 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
 }
 
 // ─── HOME SCREEN ──────────────────────────────────────────────────────────────
-function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, userName, userAvatar, setTab, setTxnFilter, setSelectedAcc, hidden }) {
+function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, targetTabungan, setTargetTabungan, userName, userAvatar, setTab, setTxnFilter, setSelectedAcc, hidden, setHidden, onViewTxn }) {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const totalBalance = accounts.reduce((s,a)=>s+a.balance,0);
-  const totalIncome  = transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
-  const totalExpense = transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+  const totalIncome  = transactions.filter(t=>t.type==="income" && t.date >= startOfMonth()).reduce((s,t)=>s+t.amount,0);
+  const totalExpense = transactions.filter(t=>t.type==="expense" && t.date >= startOfMonth()).reduce((s,t)=>s+t.amount,0);
   const budgetLeft   = monthlyBudget - totalExpense;
   const budgetPct    = Math.min(100,Math.round(totalExpense/Math.max(monthlyBudget,1)*100));
   const dLeft        = daysLeftMonth();
   const show = v => hidden ? mask(v) : fmt(v);
   const recent = [...transactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,4);
 
+  // Predictor logic
+  const daysPassed = new Date().getDate();
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
+  const avgDailyExp = daysPassed > 0 ? totalExpense / daysPassed : 0;
+  const estEndBal = Math.max(0, totalBalance - (avgDailyExp * dLeft));
+  const estZeroDays = avgDailyExp > 0 ? Math.floor(totalBalance / avgDailyExp) : "999+";
+
   return (
     <div style={{padding:"0 16px 16px"}}>
-      {/* Greeting */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           {userAvatar ? <img src={userAvatar} alt="" style={{width:42,height:42,borderRadius:12,objectFit:"cover"}}/> : <div style={{width:42,height:42,borderRadius:12,background:`linear-gradient(135deg,${G},${G2})`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}><UserCircle size={22}/></div>}
           <div><p style={{margin:0,fontSize:11,color:"#9ca3af"}}>{greeting()},</p><p style={{margin:0,fontSize:15,fontWeight:800,color:"#111"}}>{userName}</p></div>
         </div>
-        <div style={{width:40,height:40,borderRadius:12,background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.07)",color:"#374151",position:"relative"}}>
-          <Bell size={18} strokeWidth={1.7}/>
-          <div style={{position:"absolute",top:9,right:9,width:7,height:7,borderRadius:"50%",background:"#ef4444",border:"2px solid #fff"}}/>
+        <div style={{background:"#fff", borderRadius:12, padding:"8px 12px", boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <span style={{fontSize:11, fontWeight:700, color:"#64748b"}}>{getCurrentDateTopStr()}</span>
         </div>
       </div>
 
-      {/* Balance card */}
       <div style={{background:`linear-gradient(145deg,${G},${G2})`,borderRadius:22,padding:"22px 20px",marginBottom:12,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:-40,right:-40,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
-        <p style={{color:"rgba(255,255,255,0.75)",fontSize:12,margin:"0 0 6px"}}>Total Balance</p>
+        <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
+          <p style={{color:"rgba(255,255,255,0.75)",fontSize:12,margin:0}}>Total Balance</p>
+          <button onClick={()=>setHidden(p=>!p)} style={{background:"none",border:"none",color:"#fff",cursor:"pointer",display:"flex",padding:0,opacity:0.8}}>{hidden?<EyeOff size={14}/>:<Eye size={14}/>}</button>
+        </div>
         <p style={{color:"#fff",fontSize:28,fontWeight:800,margin:"0 0 18px",letterSpacing:-0.5}}>{show(totalBalance)}</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           {[{l:"Income",v:totalIncome,I:ArrowDownLeft,fn:()=>{setTxnFilter("income");setTab("transactions");}},{l:"Expense",v:totalExpense,I:ArrowUpRight,fn:()=>{setTxnFilter("expense");setTab("transactions");}}].map(x=>(
             <button key={x.l} onClick={x.fn} style={{background:"rgba(255,255,255,0.15)",borderRadius:14,padding:"11px 13px",border:"none",cursor:"pointer",textAlign:"left"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                <div style={{width:20,height:20,borderRadius:6,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}><x.I size={11}/></div>
-                <span style={{color:"rgba(255,255,255,0.8)",fontSize:11}}>{x.l}</span>
-              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><div style={{width:20,height:20,borderRadius:6,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}><x.I size={11}/></div><span style={{color:"rgba(255,255,255,0.8)",fontSize:11}}>{x.l}</span></div>
               <p style={{color:"#fff",fontSize:14,fontWeight:800,margin:0}}>{hidden?mask(x.v):fmtShort(x.v)}</p>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Budget card */}
-      <Card>
-        <Row style={{marginBottom:12}}>
-          <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Monthly Budget</p>
-          <button onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
-        </Row>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{position:"relative",width:72,height:72,flexShrink:0}}>
-            <svg width="72" height="72" style={{transform:"rotate(-90deg)"}}>
-              <circle cx="36" cy="36" r="28" fill="none" stroke="#f1f5f9" strokeWidth="8"/>
-              <circle cx="36" cy="36" r="28" fill="none" stroke={budgetPct>=90?"#ef4444":budgetPct>=70?"#f59e0b":G} strokeWidth="8"
-                strokeDasharray={`${2*Math.PI*28*(budgetPct/100)} ${2*Math.PI*28}`} strokeLinecap="round"/>
-            </svg>
-            <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontSize:12,fontWeight:800,color:"#111"}}>{budgetPct}%</span>
+      <div style={{display:"flex", gap:12, overflowX:"auto", paddingBottom:10, scrollbarWidth:"none", snapType:"x mandatory"}}>
+        {/* Budget Card */}
+        <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
+          <Card style={{height:"100%"}}>
+            <Row style={{marginBottom:12}}>
+              <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Monthly Budget</p>
+              <button onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
+            </Row>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <div style={{position:"relative",width:64,height:64,flexShrink:0}}>
+                <svg width="64" height="64" style={{transform:"rotate(-90deg)"}}>
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#f1f5f9" strokeWidth="8"/>
+                  <circle cx="32" cy="32" r="24" fill="none" stroke={budgetPct>=90?"#ef4444":budgetPct>=70?"#f59e0b":G} strokeWidth="8" strokeDasharray={`${2*Math.PI*24*(budgetPct/100)} ${2*Math.PI*24}`} strokeLinecap="round"/>
+                </svg>
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:11,fontWeight:800,color:"#111"}}>{budgetPct}%</span></div>
+              </div>
+              <div style={{flex:1}}>
+                <Row style={{marginBottom:4}}><span style={{fontSize:12,color:"#9ca3af"}}>Terpakai</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(totalExpense)}</span></Row>
+                <Row style={{marginBottom:8}}><span style={{fontSize:12,color:"#9ca3af"}}>Limit</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(monthlyBudget)}</span></Row>
+                <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/dLeft))):fmt(Math.max(0,Math.floor(budgetLeft/dLeft)))} / hari`}</p>
+              </div>
             </div>
-          </div>
-          <div style={{flex:1}}>
-            <Row style={{marginBottom:4}}><span style={{fontSize:12,color:"#9ca3af"}}>Terpakai</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(totalExpense)}</span></Row>
-            <Row style={{marginBottom:8}}><span style={{fontSize:12,color:"#9ca3af"}}>Limit</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(monthlyBudget)}</span></Row>
-            <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/dLeft))):fmt(Math.max(0,Math.floor(budgetLeft/dLeft)))} / hari`}</p>
-          </div>
+          </Card>
         </div>
-      </Card>
+        
+        {/* Predictor Card */}
+        <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
+           <Card style={{height:"100%"}}>
+             <Row style={{marginBottom:10}}>
+                <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Budget Predictor</p>
+                <TrendingUp size={16} color={G}/>
+             </Row>
+             <p style={{fontSize:11, color:"#6b7280", margin:"0 0 8px", lineHeight:1.4}}>Berdasarkan pengeluaran harian {fmtShort(avgDailyExp)}, di akhir bulan saldo sisa:</p>
+             <p style={{fontSize:20, fontWeight:800, color:estEndBal>0?G:"#ef4444", margin:"0 0 10px"}}>{show(estEndBal)}</p>
+             <p style={{fontSize:11, color:"#9ca3af", margin:0}}>Asumsi 0 income, uang akan habis dalam <b style={{color:"#111"}}>{estZeroDays} hari</b>.</p>
+           </Card>
+        </div>
+      </div>
 
-      {/* Accounts strip */}
       <Row style={{marginBottom:10}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Akun Saya</p><button onClick={()=>setTab("accounts")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
       <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:6,scrollbarWidth:"none"}}>
         {accounts.length===0 && <div style={{background:"#fff",borderRadius:16,padding:"14px 20px",minWidth:160,color:"#9ca3af",fontSize:12}}>Belum ada akun</div>}
@@ -799,14 +767,13 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, u
         })}
       </div>
 
-      {/* Recent txns */}
       <Row style={{margin:"14px 0 10px"}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Transaksi Terbaru</p><button onClick={()=>setTab("transactions")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
       <Card style={{padding:"4px 0"}}>
         {recent.length===0&&<p style={{color:"#9ca3af",textAlign:"center",padding:"20px",fontSize:13}}>Belum ada transaksi</p>}
         {recent.map((t,i)=>{
           const acc=accounts.find(a=>a.id===t.accountId);
           return (
-            <div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<recent.length-1?"1px solid #f8fafc":"none"}}>
+            <div key={t.id} onClick={()=>onViewTxn(t)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<recent.length-1?"1px solid #f8fafc":"none", cursor:"pointer"}}>
               <CatBub cat={t.category}/>
               <div style={{flex:1,minWidth:0}}>
                 <p style={{margin:0,fontSize:13,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note||"Transaksi"}</p>
@@ -820,20 +787,18 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, u
           );
         })}
       </Card>
-
-      {showBudgetModal && <BudgetModal totalBalance={totalBalance} currentBudget={monthlyBudget} onApply={v=>{setMonthlyBudget(v);setShowBudgetModal(false);}} onClose={()=>setShowBudgetModal(false)}/>}
+      {showBudgetModal && <BudgetModal totalBalance={totalBalance} currentBudget={monthlyBudget} targetTabungan={targetTabungan} setTargetTabungan={setTargetTabungan} onApply={v=>{setMonthlyBudget(v);setShowBudgetModal(false);}} onClose={()=>setShowBudgetModal(false)}/>}
     </div>
   );
 }
 
 // ─── TRANSACTIONS SCREEN ──────────────────────────────────────────────────────
-function TransactionsScreen({ transactions, accounts, onDelete, onEdit, initialTypeFilter, onFilterConsumed, searchOpen, onSearchClose }) {
+function TransactionsScreen({ transactions, accounts, onViewTxn, initialTypeFilter, onFilterConsumed, searchOpen, onSearchClose }) {
   const [typeF,   setTypeF]   = useState(initialTypeFilter||"all");
   const [dateF,   setDateF]   = useState("month");
   const [from,    setFrom]    = useState("");
   const [to,      setTo]      = useState(todayStr());
   const [search,  setSearch]  = useState("");
-  const [confirm, setConfirm] = useState(null); // {id, amount, type, accountId}
   const searchRef = useRef();
 
   useEffect(()=>{ if(initialTypeFilter){setTypeF(initialTypeFilter);onFilterConsumed&&onFilterConsumed();} },[initialTypeFilter]);
@@ -865,7 +830,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, initialT
       {(searchOpen||search) && (
         <div style={{display:"flex",alignItems:"center",gap:8,background:"#fff",borderRadius:14,padding:"10px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
           <Search size={16} color="#9ca3af"/>
-          <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari transaksi, kategori..." style={{flex:1,border:"none",outline:"none",fontSize:14,color:"#111",background:"transparent"}}/>
+          <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari transaksi..." style={{flex:1,border:"none",outline:"none",fontSize:14,color:"#111",background:"transparent"}}/>
           <button onClick={()=>{setSearch("");onSearchClose&&onSearchClose();}} style={{background:"none",border:"none",cursor:"pointer",color:"#9ca3af",display:"flex"}}><X size={16}/></button>
         </div>
       )}
@@ -877,7 +842,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, initialT
       <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:10,scrollbarWidth:"none"}}>
         {[{id:"month",l:"Bulan Ini"},{id:"today",l:"Hari Ini"},{id:"week",l:"Minggu Ini"},{id:"custom",l:"Custom"}].map(f=><FP key={f.id} label={f.l} active={dateF===f.id} onClick={()=>setDateF(f.id)}/>)}
       </div>
-      {dateF==="custom"&&<Card style={{marginBottom:10}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div><p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700}}>DARI</p><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",colorScheme:"light",background:"transparent",width:"100%"}}/></div><div><p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700}}>SAMPAI</p><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",colorScheme:"light",background:"transparent",width:"100%"}}/></div></div></Card>}
+      {dateF==="custom"&&<Card style={{marginBottom:10}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div><p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700}}>DARI</p><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",background:"transparent",width:"100%"}}/></div><div><p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700}}>SAMPAI</p><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",background:"transparent",width:"100%"}}/></div></div></Card>}
 
       <div style={{background:`linear-gradient(135deg,${G},${G2})`,borderRadius:18,padding:"16px 18px",marginBottom:14}}>
         <Row><span style={{color:"rgba(255,255,255,0.8)",fontSize:12}}>{filtered.length} transaksi</span></Row>
@@ -896,7 +861,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, initialT
             {txns.map((t,i)=>{
               const acc=accounts.find(a=>a.id===t.accountId);
               return (
-                <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<txns.length-1?"1px solid #f8fafc":"none"}}>
+                <div key={t.id} onClick={()=>onViewTxn(t)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<txns.length-1?"1px solid #f8fafc":"none", cursor:"pointer"}}>
                   <CatBub cat={t.category} size={40}/>
                   <div style={{flex:1,minWidth:0}}>
                     <p style={{margin:0,fontSize:13,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note||"Transaksi"}</p>
@@ -908,10 +873,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, initialT
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
                     <p style={{margin:0,fontSize:13,fontWeight:800,color:t.type==="income"?G:"#ef4444"}}>{t.type==="income"?"+":"-"}Rp {t.amount.toLocaleString("id-ID")}</p>
-                    <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:3}}>
-                      <button onClick={()=>onEdit(t)} style={{background:"none",border:"none",color:G,cursor:"pointer",fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:3}}><Pencil size={10}/>Edit</button>
-                      <button onClick={()=>setConfirm(t)} style={{background:"none",border:"none",color:"#d1d5db",cursor:"pointer",fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:3}}><Trash2 size={10}/>Hapus</button>
-                    </div>
+                    <p style={{margin:"2px 0 0",fontSize:10,color:"#9ca3af"}}>{t.time||"12:00"}</p>
                   </div>
                 </div>
               );
@@ -919,7 +881,6 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, initialT
           </Card>
         </div>
       ))}
-      {confirm && <ConfirmDialog title="Hapus Transaksi?" sub={`"${confirm.note||"Transaksi"}" senilai ${fmt(confirm.amount)} akan dihapus dan saldo akun akan dikoreksi.`} onConfirm={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>}
     </div>
   );
 }
@@ -930,8 +891,15 @@ function AccountsScreen({ accounts, setAccounts, transactions, setSelectedAcc })
   const [showAdd, setShowAdd] = useState(false);
   const [delConfirm, setDelConfirm] = useState(null);
   const total = accounts.reduce((s,a)=>s+a.balance,0);
-  const moveUp   = i => { if(i===0)return; const a=[...accounts]; [a[i-1],a[i]]=[a[i],a[i-1]]; setAccounts(a); };
-  const moveDown = i => { if(i===accounts.length-1)return; const a=[...accounts]; [a[i],a[i+1]]=[a[i+1],a[i]]; setAccounts(a); };
+
+  // Smooth reorder via View Transitions
+  const reorder = (arr) => {
+    if (document.startViewTransition) document.startViewTransition(() => setAccounts(arr));
+    else setAccounts(arr);
+  };
+  const moveUp   = i => { if(i===0)return; const a=[...accounts]; [a[i-1],a[i]]=[a[i],a[i-1]]; reorder(a); };
+  const moveDown = i => { if(i===accounts.length-1)return; const a=[...accounts]; [a[i],a[i+1]]=[a[i+1],a[i]]; reorder(a); };
+
   return (
     <div style={{padding:"0 16px 16px"}}>
       <div style={{background:`linear-gradient(145deg,${G},${G2})`,borderRadius:22,padding:"20px 22px",marginBottom:14}}>
@@ -943,31 +911,38 @@ function AccountsScreen({ accounts, setAccounts, transactions, setSelectedAcc })
         <button onClick={()=>setShowAdd(true)} style={{background:GL,border:"none",borderRadius:10,padding:"7px 14px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Plus size={14}/> Tambah</button>
       </Row>
       {accounts.length===0&&<Card style={{textAlign:"center",padding:"24px"}}><p style={{color:"#9ca3af",fontSize:13}}>Belum ada akun. Tambah sekarang!</p></Card>}
-      {accounts.map((acc,i)=>{
-        const T=ACC_TYPES.find(t=>t.type===acc.type);
-        return (
-          <Card key={acc.id} style={{padding:0,overflow:"hidden",marginBottom:10}}>
-            <button onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
-              <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
-                {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:28,height:28,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
+      <div style={{display:"flex", flexDirection:"column", gap:10}}>
+        {accounts.map((acc,i)=>{
+          const T=ACC_TYPES.find(t=>t.type===acc.type);
+          return (
+            <div key={acc.id} style={{background:"#fff",borderRadius:18,boxShadow:"0 2px 12px rgba(0,0,0,0.05)",overflow:"hidden", viewTransitionName:`acc-${acc.id}`}}>
+              <button onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
+                <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
+                  {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:28,height:28,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
+                </div>
+                <div style={{flex:1,textAlign:"left"}}>
+                  <p style={{margin:0,fontSize:14,fontWeight:700,color:"#fff"}}>{acc.name}</p>
+                  <p style={{margin:"2px 0 0",fontSize:11,color:"rgba(255,255,255,0.7)"}}>{acc.last4?`•••• ${acc.last4}`:T?.label}</p>
+                </div>
+                <p style={{margin:0,fontSize:15,fontWeight:800,color:"#fff"}}>{fmtShort(acc.balance)}</p>
+              </button>
+              <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
+                <button onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
+                <button onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
+                <button onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
+                <button onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Trash2 size={13}/> Hapus</button>
               </div>
-              <div style={{flex:1,textAlign:"left"}}>
-                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#fff"}}>{acc.name}</p>
-                <p style={{margin:"2px 0 0",fontSize:11,color:"rgba(255,255,255,0.7)"}}>{acc.last4?`•••• ${acc.last4}`:T?.label}</p>
-              </div>
-              <p style={{margin:0,fontSize:15,fontWeight:800,color:"#fff"}}>{fmtShort(acc.balance)}</p>
-            </button>
-            <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
-              <button onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
-              <button onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
-              <button onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
-              <button onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
             </div>
-          </Card>
-        );
-      })}
-      {editAcc&&<AccountModal initial={editAcc.acc} onClose={()=>setEditAcc(null)} isNew={false} onSave={u=>{setAccounts(p=>p.map(a=>a.id===u.id?{...a,...u}:a));setEditAcc(null);}}/>}
-      {showAdd&&<AccountModal isNew onClose={()=>setShowAdd(false)} onSave={a=>{setAccounts(p=>[...p,{...a,id:Date.now(),balance:a.balance||0}]);setShowAdd(false);}}/>}
+          );
+        })}
+      </div>
+      {editAcc&&<AccountModal initial={editAcc.acc} onClose={()=>setEditAcc(null)} isNew={false} onSave={(u, diff)=>{
+         setAccounts(p=>p.map(a=>a.id===u.id?{...a,...u}:a)); setEditAcc(null);
+         if (diff !== 0) {
+            // Trigger auto-txn untuk penyesuaian saldo
+         }
+      }}/>}
+      {showAdd&&<AccountModal isNew onClose={()=>setShowAdd(false)} onSave={(a, diff)=>{setAccounts(p=>[...p,{...a,id:Date.now(),balance:a.balance||0}]);setShowAdd(false);}}/>}
       {delConfirm&&<ConfirmDialog title="Hapus Akun?" sub={`Akun "${delConfirm.acc.name}" dan ${delConfirm.txnCount} transaksi terkait akan dihapus permanen.`} onConfirm={()=>{setAccounts(p=>p.filter(a=>a.id!==delConfirm.acc.id));setDelConfirm(null);}} onCancel={()=>setDelConfirm(null)}/>}
     </div>
   );
@@ -994,16 +969,11 @@ function ChartsScreen({ transactions }) {
         <div style={{position:"relative",userSelect:"none",WebkitUserSelect:"none"}}>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart style={{outline:"none"}} onClick={()=>{}}>
-              <Pie data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={55} paddingAngle={2} dataKey="value" style={{outline:"none"}} stroke="none">
-                {pieData.map((e,i)=><Cell key={i} fill={e.color} style={{outline:"none"}} stroke="none"/>)}
-              </Pie>
+              <Pie data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={55} paddingAngle={2} dataKey="value" style={{outline:"none"}} stroke="none">{pieData.map((e,i)=><Cell key={i} fill={e.color} style={{outline:"none"}} stroke="none"/>)}</Pie>
               <Tooltip contentStyle={{background:"#fff",border:"1px solid #f1f5f9",borderRadius:12,fontSize:12,boxShadow:"0 4px 16px rgba(0,0,0,0.08)"}} formatter={v=>[fmt(v),""]}/>
             </PieChart>
           </ResponsiveContainer>
-          <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
-            <p style={{margin:0,fontSize:10,color:"#9ca3af"}}>Total</p>
-            <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>{fmtShort(totalExp)}</p>
-          </div>
+          <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}><p style={{margin:0,fontSize:10,color:"#9ca3af"}}>Total</p><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>{fmtShort(totalExp)}</p></div>
         </div>
         <div style={{marginTop:8}}>
           {pieData.slice(0,6).map((p,i)=>(
@@ -1045,7 +1015,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
   const avatarRef = useRef();
   const handleAvatar = e => { const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>setUserAvatar(r.result);r.readAsDataURL(f); };
   const exportCSV = () => {
-    const rows=[["Tanggal","Jenis","Jumlah","Kategori","Catatan","Akun"],...transactions.map(t=>[t.date,t.type==="income"?"Pemasukan":"Pengeluaran",t.amount,t.category,t.note,accounts.find(a=>a.id===t.accountId)?.name||""])];
+    const rows=[["Tanggal","Waktu","Jenis","Jumlah","Kategori","Catatan","Akun"],...transactions.map(t=>[t.date,t.time||"12:00",t.type==="income"?"Pemasukan":"Pengeluaran",t.amount,t.category,t.note,accounts.find(a=>a.id===t.accountId)?.name||""])];
     const csv=rows.map(r=>r.map(c=>JSON.stringify(String(c))).join(",")).join("\n");
     const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="DompetKu_export.csv";a.click();
   };
@@ -1077,7 +1047,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       </Card>
       <Card style={{padding:"4px 0"}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 6.0 — Personal Finance Tracker"/>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 6.1 — Personal Finance Tracker"/>
       </Card>
       {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
       {showConfirm&&<ConfirmDialog title="Hapus Semua Data?" sub="Semua transaksi, akun, dan pengaturan akan dihapus. Tidak bisa dibatalkan." onConfirm={()=>{setTransactions([]);setAccounts([]);setShowConfirm(false);}} onCancel={()=>setShowConfirm(false)}/>}
@@ -1087,85 +1057,63 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
 
 // ─── FAN NAV ──────────────────────────────────────────────────────────────────
 const FAN_ITEMS = [
-  { id:"transactions", label:"Transaksi", Ic:<List size={22} strokeWidth={1.7}/>,     dx:-72, dy:-82 },
-  { id:"accounts",     label:"Akun",      Ic:<CreditCard size={22} strokeWidth={1.7}/>,dx:0,   dy:-95 },
-  { id:"charts",       label:"Grafik",    Ic:<BarChart2 size={22} strokeWidth={1.7}/>, dx:72,  dy:-82 },
+  { id:"transactions", label:"Transaksi", Ic:<List size={22} strokeWidth={1.7}/>,     dx:-80, dy:-65 },
+  { id:"accounts",     label:"Akun",      Ic:<CreditCard size={22} strokeWidth={1.7}/>,dx:0,   dy:-120 },
+  { id:"charts",       label:"Grafik",    Ic:<BarChart2 size={22} strokeWidth={1.7}/>, dx:80,  dy:-65 },
 ];
-function FanNav({ tab, setTab, onAddTxn, hidden, setHidden }) {
+function FanNav({ tab, setTab, onAddTxn }) {
   const [open, setOpen] = useState(false);
   const navTo = id => { setTab(id); setOpen(false); };
-  const handleCenter = () => { if (open) { onAddTxn(); setOpen(false); } else setOpen(true); };
-
+  
   return (
     <>
-      {/* Overlay */}
-      {open && <div style={{position:"fixed",inset:0,zIndex:49,background:"rgba(0,0,0,0.25)"}} onClick={()=>setOpen(false)}/>}
-
+      {open && <div style={{position:"fixed",inset:0,zIndex:49,background:"rgba(255,255,255,0.7)",backdropFilter:"blur(2px)"}} onClick={()=>setOpen(false)}/>}
+      
       <style>{`
-        @keyframes fanItem{from{opacity:0;transform:translate(-50%,10px) scale(.7)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
-        @keyframes fabBounce{0%{transform:translateX(-50%) scale(1)}30%{transform:translateX(-50%) scale(.88)}60%{transform:translateX(-50%) scale(1.12)}80%{transform:translateX(-50%) scale(.96)}100%{transform:translateX(-50%) scale(1)}}
+        .fan-item { position:absolute; left:50%; top:50%; width:56px; height:56px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(0,0,0,0.1); transition:all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); opacity:0; transform:translate(-50%, -50%) scale(0); pointer-events:none; z-index:51; border:2px solid #e5e7eb; cursor:pointer;}
+        .fan-item.open { opacity:1; pointer-events:auto; }
+        .fan-item.active { background:${G}; border-color:${G}; color:#fff; }
+        .fan-item.active span { color:#fff!important; }
       `}</style>
 
-      {/* Fan items */}
-      {open && FAN_ITEMS.map((item,i)=>(
-        <button key={item.id}
-          onClick={()=>navTo(item.id)}
-          style={{
-            position:"fixed", bottom:`calc(env(safe-area-inset-bottom,0px) + 36px)`,
-            left:`calc(50% + ${item.dx}px)`, transform:"translateX(-50%)",
-            width:52,height:52,borderRadius:"50%",
-            background:tab===item.id?G:"#fff",
-            border:`2px solid ${tab===item.id?G:"#e5e7eb"}`,
-            boxShadow:"0 4px 20px rgba(0,0,0,0.15)",
-            cursor:"pointer",color:tab===item.id?"#fff":G,
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-            zIndex:51,gap:2,
-            animation:`fanItem .25s ease ${i*0.04}s both`}}>
-          {item.Ic}
-          <span style={{fontSize:8,fontWeight:700,color:tab===item.id?"#fff":G,lineHeight:1}}>{item.label}</span>
-        </button>
-      ))}
-
-      {/* Fixed bottom bar */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"#fff",borderTop:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-around",paddingBottom:"max(env(safe-area-inset-bottom,0px),12px)",paddingTop:8,zIndex:50,boxShadow:"0 -2px 16px rgba(0,0,0,0.06)"}}>
-
-        {/* Beranda */}
-        <button onClick={()=>{setTab("home");setOpen(false);}} style={{flex:1,background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",padding:"4px 0"}}>
-          <div style={{width:34,height:34,borderRadius:11,background:tab==="home"?GL:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:tab==="home"?G:"#9ca3af"}}><Home size={19} strokeWidth={1.7}/></div>
-          <span style={{fontSize:10,fontWeight:tab==="home"?700:500,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
+      {/* Main Nav Container */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"#fff",borderTop:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 40px calc(env(safe-area-inset-bottom,0px) + 8px)",zIndex:50,boxShadow:"0 -2px 16px rgba(0,0,0,0.04)"}}>
+        
+        {/* BERANDA */}
+        <button onClick={()=>{setTab("home");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
+          <div style={{color:tab==="home"?G:"#9ca3af"}}><Home size={22} strokeWidth={2}/></div>
+          <span style={{fontSize:10,fontWeight:tab==="home"?800:600,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
         </button>
 
-        {/* Spacer left */}
-        <div style={{flex:1}}/>
+        {/* CENTER WRAPPER */}
+        <div style={{position:"relative", width:64, height:64, display:"flex", justifyContent:"center"}}>
+           {/* Arc Items */}
+           {FAN_ITEMS.map((item)=>(
+              <button key={item.id} onClick={()=>navTo(item.id)} className={`fan-item ${open?'open':''} ${tab===item.id?'active':''}`} style={{transform:open?`translate(calc(-50% + ${item.dx}px), calc(-50% + ${item.dy}px)) scale(1)`:`translate(-50%, -50%) scale(0)`, color:G}}>
+                 {item.Ic}
+                 <span style={{fontSize:8,fontWeight:700,color:G,lineHeight:1.2,marginTop:2}}>{item.label}</span>
+              </button>
+           ))}
+           {/* Add Txn Center Top (+) */}
+           <button onClick={()=>{onAddTxn(); setOpen(false);}} className={`fan-item ${open?'open':''}`} style={{transform:open?`translate(-50%, calc(-50% - 65px)) scale(1)`:`translate(-50%, -50%) scale(0)`, background:G, border:"none", color:"#fff", boxShadow:`0 6px 16px ${G}55`}}>
+              <Plus size={26} strokeWidth={2.5}/>
+              <span style={{fontSize:8,fontWeight:800,color:"#fff"}}>Catat</span>
+           </button>
 
-        {/* Center DompetKu / + button */}
-        <button onClick={handleCenter}
-          style={{position:"absolute",left:"50%",transform:"translateX(-50%)",
-            bottom:"max(calc(env(safe-area-inset-bottom,0px) + 14px),26px)",
-            width:60,height:60,borderRadius:"50%",
-            background:`linear-gradient(145deg,${G},${G2})`,
-            border:"3px solid #fff",
-            boxShadow:`0 6px 24px ${G}55`,cursor:"pointer",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            zIndex:52,transition:"transform .15s",
-            animation:open?"none":"fabBounce .4s ease"}}>
-          <div style={{transform:open?"rotate(0deg)":"rotate(0deg)",transition:"transform .3s",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {open ? <Plus size={28} strokeWidth={2.2}/> : <DompetKuLogo size={30}/>}
-          </div>
+           {/* Main Center Trigger */}
+           <button onClick={()=>setOpen(!open)} style={{position:"absolute",left:"50%",transform:"translateX(-50%) translateY(-20px)",width:64,height:64,borderRadius:"50%",background:`linear-gradient(145deg,${G},${G2})`,border:"4px solid #fff",boxShadow:`0 6px 20px ${G}50`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:52,transition:"transform 0.3s"}}>
+              <div style={{transform:open?"rotate(45deg)":"rotate(0deg)", transition:"transform 0.3s", display:"flex"}}>
+                 <DompetKuLogo size={32}/>
+              </div>
+           </button>
+        </div>
+
+        {/* PROFIL */}
+        <button onClick={()=>{setTab("profile");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
+          <div style={{color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={22} strokeWidth={2}/></div>
+          <span style={{fontSize:10,fontWeight:tab==="profile"?800:600,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
         </button>
 
-        {/* Spacer right */}
-        <div style={{flex:1}}/>
-
-        {/* Privacy toggle + Profil */}
-        <button onClick={()=>setHidden(p=>!p)} style={{background:"none",border:"none",cursor:"pointer",padding:"8px 6px 0",color:"#9ca3af",display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
-          {hidden?<EyeOff size={17} strokeWidth={1.7}/>:<Eye size={17} strokeWidth={1.7}/>}
-          <span style={{fontSize:8,fontWeight:500,color:"#9ca3af",marginTop:2}}>{hidden?"Tampilkan":"Sensor"}</span>
-        </button>
-        <button onClick={()=>{setTab("profile");setOpen(false);}} style={{flex:1,background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",padding:"4px 0"}}>
-          <div style={{width:34,height:34,borderRadius:11,background:tab==="profile"?GL:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={19} strokeWidth={1.7}/></div>
-          <span style={{fontSize:10,fontWeight:tab==="profile"?700:500,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
-        </button>
       </div>
     </>
   );
@@ -1173,7 +1121,7 @@ function FanNav({ tab, setTab, onAddTxn, hidden, setHidden }) {
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const isPickingFile = useRef(false); // FIX #3: suppress auto-lock during file picker
+  const isPickingFile = useRef(false);
 
   // Persisted state
   const [onboarded,  setOnboarded]  = useState(()=>lsGet("dk_onboarded",false));
@@ -1183,20 +1131,18 @@ export default function App() {
   const [pinHash,    setPinHash]    = useState(()=>lsGet("dk_pin_hash",""));
   const [soundEnabled,setSoundEnabled]=useState(()=>lsGet("dk_sound",false));
   const [monthlyBudget,setMonthlyBudget]=useState(()=>lsGet("dk_budget",10000000));
+  const [targetTabungan,setTargetTabungan]=useState(()=>lsGet("dk_target_tabungan", 20)); // Persisted target
   const [accounts,   setAccounts]   = useState(()=>lsGet("dk_accounts",[]));
   const [transactions,setTransactions]=useState(()=>lsGet("dk_txns",[]));
   const [hidden,     setHidden]     = useState(()=>lsGet("dk_hidden",false));
-  const [accOrder,   setAccOrder]   = useState(()=>lsGet("dk_acc_order",null));
 
-  // FIX #2: locked starts true if PIN is enabled (survives reload)
   const [locked,     setLocked]     = useState(()=>lsGet("dk_pin_on",false));
-
-  // Session state
   const [tab,        setTab]        = useState("home");
   const [showAdd,    setShowAdd]    = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [txnFilter,  setTxnFilter]  = useState(null);
   const [selectedAcc,setSelectedAcc]= useState(null);
+  const [viewTxn,    setViewTxn]    = useState(null); // Full Detail view for Txn
   const [editTxn,    setEditTxn]    = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -1208,58 +1154,52 @@ export default function App() {
   useEffect(()=>lsSet("dk_pin_hash",pinHash),[pinHash]);
   useEffect(()=>lsSet("dk_sound",soundEnabled),[soundEnabled]);
   useEffect(()=>lsSet("dk_budget",monthlyBudget),[monthlyBudget]);
+  useEffect(()=>lsSet("dk_target_tabungan",targetTabungan),[targetTabungan]);
   useEffect(()=>lsSet("dk_accounts",accounts),[accounts]);
   useEffect(()=>lsSet("dk_txns",transactions),[transactions]);
   useEffect(()=>lsSet("dk_hidden",hidden),[hidden]);
 
-  // FIX #3 + #8: auto-lock on visibility change, but NOT when picking files
   useEffect(()=>{
     const handle = () => { if (document.hidden && pinEnabled && !isPickingFile.current) setLocked(true); };
     document.addEventListener("visibilitychange", handle);
     return () => document.removeEventListener("visibilitychange", handle);
   }, [pinEnabled]);
 
-  // FIX #4: back button handling
-  useEffect(()=>{
-    history.pushState({p:"home"},"");
-    const handle = e => {
+  // Back button routing correction
+  useEffect(() => {
+    window.history.pushState({p:"home"},"");
+    const handlePopState = (e) => {
       if (locked) return;
-      if (selectedAcc) { setSelectedAcc(null); history.pushState({p:"home"},""); return; }
-      if (tab !== "home") { setTab("home"); history.pushState({p:"home"},""); return; }
+      if (viewTxn) { setViewTxn(null); window.history.pushState({p:"home"},""); return; }
+      if (selectedAcc) { setSelectedAcc(null); window.history.pushState({p:"home"},""); return; }
+      if (tab !== "home") { setTab("home"); window.history.pushState({p:"home"},""); return; }
+      
       const confirmed = window.confirm("Keluar dari DompetKu?");
-      if (confirmed) window.history.back(); else history.pushState({p:"home"},"");
+      if (confirmed) { window.history.back(); } 
+      else { window.history.pushState({p:"home"},""); }
     };
-    window.addEventListener("popstate", handle);
-    return () => window.removeEventListener("popstate", handle);
-  }, [tab, selectedAcc, locked]);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [tab, selectedAcc, viewTxn, locked]);
 
-  // FIX #7: delete transaction AND revert balance
   const deleteTransaction = useCallback(txn => {
     setTransactions(p => p.filter(t => t.id !== txn.id));
-    setAccounts(p => p.map(a => a.id === txn.accountId
-      ? { ...a, balance: a.balance + (txn.type === "income" ? -txn.amount : txn.amount) }
-      : a));
-    // Clean attachments from IDB
+    setAccounts(p => p.map(a => a.id === txn.accountId ? { ...a, balance: a.balance + (txn.type === "income" ? -txn.amount : txn.amount) } : a));
     (txn.attachmentMeta||[]).forEach(att => IDB.del(att.id).catch(()=>{}));
+    setViewTxn(null);
   }, []);
 
-  // Add transaction
   const addTransaction = useCallback(form => {
     const newTxn = { ...form, id: Date.now(), detected: form.detected || null };
     setTransactions(p => [newTxn, ...p]);
-    setAccounts(p => p.map(a => a.id === form.accountId
-      ? { ...a, balance: a.balance + (form.type === "income" ? form.amount : -form.amount) }
-      : a));
+    setAccounts(p => p.map(a => a.id === form.accountId ? { ...a, balance: a.balance + (form.type === "income" ? form.amount : -form.amount) } : a));
     setShowAdd(false); setEditTxn(null);
   }, []);
 
-  // FIX edit transaction: revert old, apply new
   const updateTransaction = useCallback((original, updated) => {
     setAccounts(p => p.map(a => {
       let bal = a.balance;
-      // Revert original
       if (a.id === original.accountId) bal += original.type === "income" ? -original.amount : original.amount;
-      // Apply updated
       if (a.id === updated.accountId) bal += updated.type === "income" ? updated.amount : -updated.amount;
       return a.id === original.accountId || a.id === updated.accountId ? { ...a, balance: bal } : a;
     }));
@@ -1267,30 +1207,26 @@ export default function App() {
     setEditTxn(null);
   }, []);
 
-  const importTxns = useCallback(txns => {
-    setTransactions(p => [...txns, ...p]);
-    setAccounts(p => p.map(acc => {
-      const delta = txns.reduce((sum, t) => {
-        if (t.accountId !== acc.id) return sum;
-        return sum + (t.type === "income" ? t.amount : -t.amount);
-      }, 0);
-      return delta ? { ...acc, balance: acc.balance + delta } : acc;
-    }));
+  // Handler for Account Balance adjustment 
+  const handleAccountSave = useCallback((accData, balDiff) => {
+    if (balDiff !== 0) {
+      const adjTxn = {
+        id: Date.now(), accountId: accData.id,
+        type: balDiff > 0 ? "income" : "expense",
+        amount: Math.abs(balDiff),
+        category: "Penyesuaian Saldo", note: "Penyesuaian manual",
+        date: todayStr(), time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}),
+      };
+      setTransactions(p => [adjTxn, ...p]);
+    }
   }, []);
 
+  const importTxns = txns => setTransactions(p => [...txns, ...p]);
   const titleMap = { home:"Beranda", transactions:"Riwayat", accounts:"Akun", charts:"Analisis", profile:"Profil" };
 
-  // ── RENDER GUARDS ──────────────────────────────────────────────────────────
   if (!onboarded) return <OnboardingScreen onDone={name=>{setUserName(name);setOnboarded(true);}}/>;
   if (locked && pinEnabled) return <PinScreen mode="unlock" savedHash={pinHash} onUnlock={()=>setLocked(false)}/>;
-  if (selectedAcc) return (
-    <AccountDetailScreen account={selectedAcc.acc} transactions={transactions} accIdx={selectedAcc.idx}
-      onClose={()=>setSelectedAcc(null)}
-      onEditAccount={()=>{
-        // open edit modal in accounts screen
-        setSelectedAcc(null); setTab("accounts");
-      }}/>
-  );
+  if (selectedAcc) return <AccountDetailScreen account={selectedAcc.acc} transactions={transactions} accIdx={selectedAcc.idx} onClose={()=>setSelectedAcc(null)} onEditAccount={()=>{setSelectedAcc(null); setTab("accounts");}}/>;
 
   return (
     <div style={{fontFamily:"'Outfit',sans-serif",background:BG,minHeight:"100vh",maxWidth:430,margin:"0 auto",paddingBottom:82}}>
@@ -1307,7 +1243,7 @@ export default function App() {
       `}</style>
 
       {/* HEADER */}
-      <div style={{background:"#fff",paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)",paddingBottom:12,paddingLeft:20,paddingRight:20,display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #f1f5f9",position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 0 #f1f5f9"}}>
+      <div style={{background:"#fff",paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)",paddingBottom:12,paddingLeft:20,paddingRight:20,display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #f1f5f9",position:"sticky",top:0,zIndex:50}}>
         <h1 style={{margin:0,fontSize:17,fontWeight:800,color:"#111"}}>{titleMap[tab]}</h1>
         <div style={{display:"flex",gap:8}}>
           {tab==="transactions"&&<button onClick={()=>setSearchOpen(p=>!p)} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><Search size={15} strokeWidth={1.7}/></button>}
@@ -1317,22 +1253,21 @@ export default function App() {
 
       {/* CONTENT */}
       <div style={{paddingTop:14}} className="screen" key={tab}>
-        {tab==="home"         && <HomeScreen accounts={accounts} transactions={transactions} monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget} userName={userName} userAvatar={userAvatar} setTab={setTab} setTxnFilter={setTxnFilter} setSelectedAcc={setSelectedAcc} hidden={hidden}/>}
-        {tab==="transactions" && <TransactionsScreen transactions={transactions} accounts={accounts} onDelete={deleteTransaction} onEdit={t=>{setEditTxn(t);}} initialTypeFilter={txnFilter} onFilterConsumed={()=>setTxnFilter(null)} searchOpen={searchOpen} onSearchClose={()=>setSearchOpen(false)}/>}
+        {tab==="home"         && <HomeScreen accounts={accounts} transactions={transactions} monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget} targetTabungan={targetTabungan} setTargetTabungan={setTargetTabungan} userName={userName} userAvatar={userAvatar} setTab={setTab} setTxnFilter={setTxnFilter} setSelectedAcc={setSelectedAcc} hidden={hidden} setHidden={setHidden} onViewTxn={setViewTxn}/>}
+        {tab==="transactions" && <TransactionsScreen transactions={transactions} accounts={accounts} onViewTxn={setViewTxn} initialTypeFilter={txnFilter} onFilterConsumed={()=>setTxnFilter(null)} searchOpen={searchOpen} onSearchClose={()=>setSearchOpen(false)}/>}
         {tab==="accounts"     && <AccountsScreen accounts={accounts} setAccounts={setAccounts} transactions={transactions} setSelectedAcc={setSelectedAcc}/>}
         {tab==="charts"       && <ChartsScreen transactions={transactions}/>}
-        {tab==="profile"      && <ProfileScreen userName={userName} setUserName={setUserName} userAvatar={userAvatar} setUserAvatar={setUserAvatar} transactions={transactions} accounts={accounts} monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget} pinEnabled={pinEnabled} pinHash={pinHash} setPinEnabled={setPinEnabled} setPinHash={h=>{setPinHash(h);setPinEnabled(true);}} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} setTransactions={setTransactions} setAccounts={setAccounts} setShowImport={setShowImport}/>}
+        {tab==="profile"      && <ProfileScreen userName={userName} setUserName={setUserName} userAvatar={userAvatar} setUserAvatar={setUserAvatar} transactions={transactions} accounts={accounts} pinEnabled={pinEnabled} pinHash={pinHash} setPinEnabled={setPinEnabled} setPinHash={h=>{setPinHash(h);setPinEnabled(true);}} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} setTransactions={setTransactions} setAccounts={setAccounts} setShowImport={setShowImport}/>}
       </div>
 
       {/* BOTTOM FAB NAV */}
-      <FanNav tab={tab} setTab={setTab} onAddTxn={()=>setShowAdd(true)} hidden={hidden} setHidden={setHidden}/>
+      <FanNav tab={tab} setTab={setTab} onAddTxn={()=>setShowAdd(true)} />
 
       {/* MODALS */}
-      {showAdd && accounts.length === 0 && (
-        <ConfirmDialog title="Belum ada akun!" sub='Tambahkan akun keuangan dulu sebelum mencatat transaksi.' onConfirm={()=>{setShowAdd(false);setTab("accounts");}} onCancel={()=>setShowAdd(false)} danger={false}/>
-      )}
+      {showAdd && accounts.length === 0 && <ConfirmDialog title="Belum ada akun!" sub='Tambahkan akun keuangan dulu sebelum mencatat transaksi.' onConfirm={()=>{setShowAdd(false);setTab("accounts");}} onCancel={()=>setShowAdd(false)} danger={false}/>}
       {showAdd && accounts.length > 0 && <TxnModal accounts={accounts} onClose={()=>setShowAdd(false)} onSave={addTransaction} soundEnabled={soundEnabled} isPickingFile={isPickingFile}/>}
       {editTxn && <TxnModal initial={{...editTxn, amountStr:editTxn.amount.toLocaleString("id-ID")}} accounts={accounts} onClose={()=>setEditTxn(null)} onSave={updated=>updateTransaction(editTxn,updated)} soundEnabled={soundEnabled} isPickingFile={isPickingFile} />}
+      {viewTxn && <TxnDetailModal txn={viewTxn} accounts={accounts} onClose={()=>setViewTxn(null)} onEdit={setEditTxn} onDelete={deleteTransaction}/>}
       {showImport && <ImportModal accounts={accounts} onClose={()=>setShowImport(false)} onImport={importTxns} isPickingFile={isPickingFile}/>}
     </div>
   );
