@@ -619,7 +619,9 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   const ref = useRef();
   const parse = async e => {
     isPickingFile.current = false;
-    const file = e.target.files[0]; if (!file) return; setSt("parsing");
+    const file = e.target.files[0]; if (!file) return;
+    if (!accounts.length) { setErr("Tambahkan akun terlebih dahulu sebelum import."); setSt("error"); return; }
+    setSt("parsing");
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf,{type:"array"}); const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1265,7 +1267,16 @@ export default function App() {
     setEditTxn(null);
   }, []);
 
-  const importTxns = txns => setTransactions(p => [...txns, ...p]);
+  const importTxns = useCallback(txns => {
+    setTransactions(p => [...txns, ...p]);
+    setAccounts(p => p.map(acc => {
+      const delta = txns.reduce((sum, t) => {
+        if (t.accountId !== acc.id) return sum;
+        return sum + (t.type === "income" ? t.amount : -t.amount);
+      }, 0);
+      return delta ? { ...acc, balance: acc.balance + delta } : acc;
+    }));
+  }, []);
 
   const titleMap = { home:"Beranda", transactions:"Riwayat", accounts:"Akun", charts:"Analisis", profile:"Profil" };
 
