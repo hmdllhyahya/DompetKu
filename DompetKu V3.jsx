@@ -1,4 +1,4 @@
-// DompetKu Ultimate Version (Merged V4 + Gemini Native Carousel)
+// DompetKu Ultimate Version (Merged V4 + Gemini Native Carousel + Biometrics Fix)
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Camera, Shield, Download, Upload, AlertTriangle,
   Check, Volume2, VolumeX, Coffee, ShoppingCart, ShoppingBag, Car, Zap,
   Heart, BookOpen, Scissors, Briefcase, Gift, TrendingUp, MoreHorizontal,
-  Monitor, Eye, EyeOff, ArrowDownLeft, ArrowUpRight,
+  Monitor, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, Fingerprint,
   PiggyBank, Receipt, Star, Sliders,
   ExternalLink, MapPin, Film, Train, Bus, Calendar, Clock
 } from "lucide-react";
@@ -184,6 +184,7 @@ const nowTime   = () => new Date().toTimeString().slice(0,5);
 const startOfWeek  = () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
 const startOfMonth = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; };
 const daysLeftMonth= () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate()-d.getDate()+1; };
+const daysInMonth  = () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); };
 const greeting  = () => { const h=new Date().getHours(); return h<12?"Selamat Pagi":h<15?"Selamat Siang":h<18?"Selamat Sore":"Selamat Malam"; };
 const fmtDate   = () => { const d=new Date(); return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"2-digit"}); };
 const labelDate = s => {
@@ -261,11 +262,12 @@ const ConfirmDialog = ({title,sub,onConfirm,onCancel,danger=true,confirmLabel="Y
 );
 
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
-function PinScreen({ mode="unlock", savedHash, onUnlock, onSetPin, onCancel }) {
+function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, onCancel }) {
   const [input,   setInput]   = useState("");
   const [confirm, setConfirm] = useState("");
   const [step,    setStep]    = useState("enter");
   const [err,     setErr]     = useState("");
+  
   const handleDigit = d => {
     if (mode==="set") {
       if (step==="enter") { const n=input+d; setInput(n); if(n.length===4)setStep("confirm"); }
@@ -276,6 +278,12 @@ function PinScreen({ mode="unlock", savedHash, onUnlock, onSetPin, onCancel }) {
     }
   };
   const del = () => { if(step==="confirm")setConfirm(c=>c.slice(0,-1)); else setInput(i=>i.slice(0,-1)); };
+  
+  const handleBio = () => {
+    // Simulasi native auth (langsung tembus untuk mockup web)
+    onUnlock();
+  };
+
   const cur = step==="confirm"?confirm:input;
   return (
     <div style={{position:"fixed",inset:0,background:`linear-gradient(160deg,${G},${G2})`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:400,padding:24}}>
@@ -284,11 +292,12 @@ function PinScreen({ mode="unlock", savedHash, onUnlock, onSetPin, onCancel }) {
       <p style={{color:"rgba(255,255,255,0.75)",fontSize:13,marginBottom:32}}>{mode==="set"?(step==="enter"?"Buat PIN 4 Digit":"Konfirmasi PIN"):"Masukkan PIN"}</p>
       <div style={{display:"flex",gap:14,marginBottom:12}}>{[0,1,2,3].map(i=><div key={i} style={{width:16,height:16,borderRadius:"50%",background:cur.length>i?"#fff":"rgba(255,255,255,0.3)",transition:"background .15s"}}/>)}</div>
       {err&&<p style={{color:"#fca5a5",fontSize:13,marginBottom:8}}>{err}</p>}
+      
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,width:240,marginTop:16}}>
-        {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((d,i)=>(
-          <button key={i} onClick={()=>d==="⌫"?del():d!==""?handleDigit(String(d)):null} disabled={d===""}
-            style={{height:64,borderRadius:16,background:d==="⌫"?"rgba(255,255,255,0.15)":d===""?"transparent":"rgba(255,255,255,0.2)",border:"none",color:"#fff",fontSize:d==="⌫"?18:22,fontWeight:700,cursor:d===""?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {d}
+        {[1,2,3,4,5,6,7,8,9, (mode==="unlock" && bioEnabled ? "BIO" : ""), 0, "⌫"].map((d,i)=>(
+          <button key={i} onClick={()=>d==="⌫"?del():d==="BIO"?handleBio():d!==""?handleDigit(String(d)):null} disabled={d===""}
+            style={{height:64,borderRadius:16,background:d==="⌫"||d==="BIO"?"rgba(255,255,255,0.15)":d===""?"transparent":"rgba(255,255,255,0.2)",border:"none",color:"#fff",fontSize:d==="⌫"?18:22,fontWeight:700,cursor:d===""?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {d==="⌫" ? <Trash2 size={20} strokeWidth={2}/> : d==="BIO" ? <Fingerprint size={26} strokeWidth={1.8}/> : d}
           </button>
         ))}
       </div>
@@ -510,9 +519,13 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
       <div style={{background:"#f8fafc",width:"100%",maxWidth:430,margin:"0 auto",borderRadius:"24px 24px 0 0",maxHeight:"92vh",overflowY:"auto",paddingBottom:32}}>
         <div style={{background:grad,borderRadius:"24px 24px 0 0",padding:"20px 18px 24px",position:"relative"}}>
           <button onClick={onClose} style={{position:"absolute",top:16,left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:9,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><X size={16}/></button>
+          
           <div style={{textAlign:"center",paddingTop:8}}>
-            <CatBub cat={txn.category} size={56}/>
-            <p style={{color:"#fff",fontSize:13,fontWeight:600,margin:"10px 0 2px"}}>{txn.note||"Transaksi"}</p>
+            {/* FIX: Centered container for category icon to prevent overlapping with X */}
+            <div style={{display:"flex", justifyContent:"center", marginBottom: 10}}>
+              <CatBub cat={txn.category} size={56}/>
+            </div>
+            <p style={{color:"#fff",fontSize:13,fontWeight:600,margin:"0 0 2px"}}>{txn.note||"Transaksi"}</p>
             <p style={{color:"#fff",fontSize:28,fontWeight:800,margin:"0 0 4px"}}>{txn.type==="income"?"+":"-"}{fmt(txn.amount)}</p>
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:99}}>{txn.category}</span>
@@ -736,7 +749,6 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
   const show         = v => hidden ? mask(v) : fmt(v);
   const recent       = [...transactions].sort((a,b)=>(b.date+(b.time||""))-(a.date+(a.time||""))).slice(0,5);
 
-  // Predictor logic (Gemini native scroll style)
   const daysPassed = new Date().getDate();
   const avgDailyExp = daysPassed > 0 ? totalExpense / daysPassed : 0;
   const estEndBal = Math.max(0, totalBalance - (avgDailyExp * dLeft));
@@ -749,7 +761,6 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
           {userAvatar?<img src={userAvatar} alt="" style={{width:42,height:42,borderRadius:12,objectFit:"cover"}}/>:<div style={{width:42,height:42,borderRadius:12,background:`linear-gradient(135deg,${G},${G2})`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}><UserCircle size={22}/></div>}
           <div><p style={{margin:0,fontSize:11,color:"#9ca3af"}}>{greeting()},</p><p style={{margin:0,fontSize:15,fontWeight:800,color:"#111"}}>{userName}</p></div>
         </div>
-        <div style={{fontSize:12,fontWeight:600,color:"#9ca3af",background:"#fff",borderRadius:10,padding:"6px 10px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)",lineHeight:1.3,textAlign:"right"}}>{fmtDate()}</div>
       </div>
 
       <div style={{background:`linear-gradient(145deg,${G},${G2})`,borderRadius:22,padding:"22px 20px",marginBottom:12,position:"relative",overflow:"hidden"}}>
@@ -769,7 +780,6 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         </div>
       </div>
 
-      {/* Gemini Native Scroll Carousel */}
       <div style={{display:"flex", gap:12, overflowX:"auto", paddingBottom:10, scrollbarWidth:"none", snapType:"x mandatory"}}>
         {/* Budget Card */}
         <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
@@ -901,7 +911,8 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
             {txns.map((t,i)=>{
               const acc=accounts.find(a=>a.id===t.accountId);
               return (
-                <button key={t.id} onClick={()=>onTxnClick(t)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<txns.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
+                <button key={t.id} onClick={()=>onTxnClick(t)}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<txns.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
                   <CatBub cat={t.category} size={40}/>
                   <div style={{flex:1,minWidth:0}}>
                     <p style={{margin:0,fontSize:13,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note||"Transaksi"}</p>
@@ -928,17 +939,20 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
   const [editAcc,   setEditAcc]   = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
   const [delConfirm,setDelConfirm]= useState(null);
+  const [animatingId, setAnimatingId] = useState(null);
   const total = accounts.reduce((s,a)=>s+a.balance,0);
 
   const moveUp = i => {
     if(i===0) return;
-    const a=[...accounts]; [a[i-1],a[i]]=[a[i],a[i-1]];
-    if(document.startViewTransition) document.startViewTransition(()=>setAccounts(a)); else setAccounts(a);
+    setAnimatingId(accounts[i].id);
+    const a=[...accounts]; [a[i-1],a[i]]=[a[i],a[i-1]]; setAccounts(a);
+    setTimeout(()=>setAnimatingId(null),350);
   };
   const moveDown = i => {
     if(i===accounts.length-1) return;
-    const a=[...accounts]; [a[i],a[i+1]]=[a[i+1],a[i]];
-    if(document.startViewTransition) document.startViewTransition(()=>setAccounts(a)); else setAccounts(a);
+    setAnimatingId(accounts[i].id);
+    const a=[...accounts]; [a[i],a[i+1]]=[a[i+1],a[i]]; setAccounts(a);
+    setTimeout(()=>setAnimatingId(null),350);
   };
 
   const handleSaveAcc = (updated, adjustment) => {
@@ -965,24 +979,27 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
       <div style={{display:"flex", flexDirection:"column", gap:10}}>
         {accounts.map((acc,i)=>{
           const T=ACC_TYPES.find(t=>t.type===acc.type);
+          const isAnim = animatingId===acc.id;
           return (
-            <div key={acc.id} style={{viewTransitionName:`acc-${acc.id}`, background:"#fff", borderRadius:18, boxShadow:"0 2px 12px rgba(0,0,0,0.05)", overflow:"hidden"}}>
-              <button onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
-                <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
-                  {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:28,height:28,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
+            <div key={acc.id} style={{transition:"transform .3s cubic-bezier(0.34,1.56,0.64,1), opacity .2s",transform:isAnim?"scale(1.02)":"scale(1)",opacity:isAnim?0.85:1,marginBottom:10}}>
+              <Card style={{padding:0,overflow:"hidden",marginBottom:0}}>
+                <button onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
+                    {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:28,height:28,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
+                  </div>
+                  <div style={{flex:1,textAlign:"left"}}>
+                    <p style={{margin:0,fontSize:14,fontWeight:700,color:"#fff"}}>{acc.name}</p>
+                    <p style={{margin:"2px 0 0",fontSize:11,color:"rgba(255,255,255,0.7)"}}>{acc.last4?`•••• ${acc.last4}`:T?.label}</p>
+                  </div>
+                  <p style={{margin:0,fontSize:15,fontWeight:800,color:"#fff"}}>{fmtShort(acc.balance)}</p>
+                </button>
+                <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
+                  <button onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
+                  <button onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
+                  <button onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
+                  <button onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
                 </div>
-                <div style={{flex:1,textAlign:"left"}}>
-                  <p style={{margin:0,fontSize:14,fontWeight:700,color:"#fff"}}>{acc.name}</p>
-                  <p style={{margin:"2px 0 0",fontSize:11,color:"rgba(255,255,255,0.7)"}}>{acc.last4?`•••• ${acc.last4}`:T?.label}</p>
-                </div>
-                <p style={{margin:0,fontSize:15,fontWeight:800,color:"#fff"}}>{fmtShort(acc.balance)}</p>
-              </button>
-              <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
-                <button onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
-                <button onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
-                <button onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
-                <button onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Trash2 size={13}/> Hapus</button>
-              </div>
+              </Card>
             </div>
           );
         })}
@@ -1056,18 +1073,20 @@ function ChartsScreen({ transactions }) {
 }
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
-function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, transactions, accounts, pinEnabled, pinHash, setPinEnabled, setPinHash, soundEnabled, setSoundEnabled, setTransactions, setAccounts, setShowImport }) {
+function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, transactions, accounts, pinEnabled, pinHash, setPinEnabled, setPinHash, bioEnabled, setBioEnabled, soundEnabled, setSoundEnabled, setTransactions, setAccounts, setShowImport }) {
   const [showSetPin,  setShowSetPin]  = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [editName,    setEditName]    = useState(false);
   const [nameInput,   setNameInput]   = useState(userName);
   const avatarRef = useRef();
+  
   const handleAvatar = e => { const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>setUserAvatar(r.result);r.readAsDataURL(f); };
   const exportCSV = () => {
     const rows=[["Tanggal","Jam","Jenis","Jumlah","Kategori","Catatan","Akun"],...transactions.map(t=>[t.date,t.time||"",t.type==="income"?"Pemasukan":"Pengeluaran",t.amount,t.category,t.note,accounts.find(a=>a.id===t.accountId)?.name||""])];
     const csv=rows.map(r=>r.map(c=>JSON.stringify(String(c))).join(",")).join("\n");
     const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="DompetKu_export.csv";a.click();
   };
+  
   return (
     <div style={{padding:"0 16px 16px"}}>
       <Card style={{textAlign:"center",padding:"24px 16px"}}>
@@ -1079,25 +1098,32 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
         {editName?<div style={{display:"flex",gap:8,justifyContent:"center",alignItems:"center"}}><input value={nameInput} onChange={e=>setNameInput(e.target.value)} style={{border:`1.5px solid ${G}`,borderRadius:10,padding:"6px 12px",fontSize:14,fontWeight:700,outline:"none",textAlign:"center"}}/><button onClick={()=>{setUserName(nameInput);setEditName(false);}} style={{background:G,border:"none",borderRadius:9,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Check size={14}/></button></div>:<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8}}><p style={{margin:0,fontSize:16,fontWeight:800,color:"#111"}}>{userName}</p><button onClick={()=>setEditName(true)} style={{background:"none",border:"none",color:"#9ca3af",cursor:"pointer"}}><Pencil size={14}/></button></div>}
         <p style={{margin:"4px 0 0",fontSize:12,color:"#9ca3af"}}>{transactions.length} transaksi · {accounts.length} akun</p>
       </Card>
+      
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>KEAMANAN</p>
-        <SRow icon={<Lock size={15} strokeWidth={1.7}/>} title="Kunci PIN" sub={pinEnabled?"Aktif — app terkunci saat keluar background":"Nonaktif"} right={<Tog on={pinEnabled} onToggle={()=>pinEnabled?setPinEnabled(false):setShowSetPin(true)}/>}/>
+        <SRow icon={<Lock size={15} strokeWidth={1.7}/>} title="Kunci PIN" sub={pinEnabled?"Aktif — app terkunci saat keluar background":"Nonaktif"} 
+          right={<Tog on={pinEnabled} onToggle={()=>{ if(pinEnabled){setPinEnabled(false);setBioEnabled(false);}else{setShowSetPin(true);} }}/>}/>
+        {pinEnabled&&<SRow icon={<Fingerprint size={15} strokeWidth={1.7}/>} title="Biometrik" sub="Gunakan sidik jari / wajah" right={<Tog on={bioEnabled} onToggle={()=>setBioEnabled(p=>!p)}/> }/>}
         {pinEnabled&&<SRow icon={<Shield size={15} strokeWidth={1.7}/>} title="Ganti PIN" right={<button onClick={()=>setShowSetPin(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Ubah</button>}/>}
       </Card>
+      
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>PREFERENSI</p>
         <SRow icon={soundEnabled?<Volume2 size={15}/>:<VolumeX size={15}/>} title="Efek Suara" sub="Suara saat mencatat transaksi" right={<Tog on={soundEnabled} onToggle={()=>setSoundEnabled(p=>!p)}/>}/>
       </Card>
+      
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>DATA</p>
         <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
         <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
         <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button onClick={()=>setShowConfirm(true)} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
       </Card>
+      
       <Card style={{padding:"4px 0"}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.1 (Ultimate Edition)"/>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.2 (Ultimate Edition)"/>
       </Card>
+      
       {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
       {showConfirm&&<ConfirmDialog title="Hapus Semua Data?" sub="Semua transaksi, akun, dan pengaturan akan dihapus. Tidak bisa dibatalkan." onConfirm={()=>{setTransactions([]);setAccounts([]);setShowConfirm(false);}} onCancel={()=>setShowConfirm(false)}/>}
     </div>
@@ -1223,6 +1249,7 @@ export default function App() {
   const [userAvatar,   setUserAvatar]   = useState(()=>lsGet("dk_avatar",null));
   const [pinEnabled,   setPinEnabled]   = useState(()=>lsGet("dk_pin_on",false));
   const [pinHash,      setPinHash]      = useState(()=>lsGet("dk_pin_hash",""));
+  const [bioEnabled,   setBioEnabled]   = useState(()=>lsGet("dk_bio_on",false));
   const [soundEnabled, setSoundEnabled] = useState(()=>lsGet("dk_sound",false));
   const [monthlyBudget,setMonthlyBudget]= useState(()=>lsGet("dk_budget",10000000));
   const [savedPct,     setSavedPct]     = useState(()=>lsGet("dk_save_pct",20));
@@ -1246,6 +1273,7 @@ export default function App() {
   useEffect(()=>lsSet("dk_avatar",userAvatar),[userAvatar]);
   useEffect(()=>lsSet("dk_pin_on",pinEnabled),[pinEnabled]);
   useEffect(()=>lsSet("dk_pin_hash",pinHash),[pinHash]);
+  useEffect(()=>lsSet("dk_bio_on",bioEnabled),[bioEnabled]);
   useEffect(()=>lsSet("dk_sound",soundEnabled),[soundEnabled]);
   useEffect(()=>lsSet("dk_budget",monthlyBudget),[monthlyBudget]);
   useEffect(()=>lsSet("dk_save_pct",savedPct),[savedPct]);
@@ -1303,7 +1331,7 @@ export default function App() {
   const titleMap={home:"Beranda",transactions:"Riwayat",accounts:"Akun",charts:"Analisis",profile:"Profil"};
 
   if(!onboarded)return<OnboardingScreen onDone={name=>{setUserName(name);setOnboarded(true);}}/>;
-  if(locked&&pinEnabled)return<PinScreen mode="unlock" savedHash={pinHash} onUnlock={()=>setLocked(false)}/>;
+  if(locked&&pinEnabled)return<PinScreen mode="unlock" savedHash={pinHash} bioEnabled={bioEnabled} onUnlock={()=>setLocked(false)}/>;
   if(selectedAcc)return <AccountDetailScreen account={selectedAcc.acc} transactions={transactions} accIdx={selectedAcc.idx} onClose={()=>setSelectedAcc(null)} onEditAccount={()=>{setSelectedAcc(null);setTab("accounts");}}/>;
 
   return (
@@ -1339,7 +1367,7 @@ export default function App() {
         {tab==="transactions"&&<TransactionsScreen transactions={transactions} accounts={accounts} onDelete={deleteTransaction} onEdit={t=>{setEditTxn(t);}} onTxnClick={t=>setViewTxn(t)} initialTypeFilter={txnFilter} onFilterConsumed={()=>setTxnFilter(null)} searchOpen={searchOpen} onSearchClose={()=>setSearchOpen(false)}/>}
         {tab==="accounts"&&<AccountsScreen accounts={accounts} setAccounts={setAccounts} transactions={transactions} setTransactions={setTransactions} setSelectedAcc={setSelectedAcc}/>}
         {tab==="charts"&&<ChartsScreen transactions={transactions}/>}
-        {tab==="profile"&&<ProfileScreen userName={userName} setUserName={setUserName} userAvatar={userAvatar} setUserAvatar={setUserAvatar} transactions={transactions} accounts={accounts} pinEnabled={pinEnabled} pinHash={pinHash} setPinEnabled={setPinEnabled} setPinHash={h=>{setPinHash(h);setPinEnabled(true);}} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} setTransactions={setTransactions} setAccounts={setAccounts} setShowImport={setShowImport}/>}
+        {tab==="profile"&&<ProfileScreen userName={userName} setUserName={setUserName} userAvatar={userAvatar} setUserAvatar={setUserAvatar} transactions={transactions} accounts={accounts} pinEnabled={pinEnabled} pinHash={pinHash} setPinEnabled={setPinEnabled} setPinHash={h=>{setPinHash(h);setPinEnabled(true);}} bioEnabled={bioEnabled} setBioEnabled={setBioEnabled} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} setTransactions={setTransactions} setAccounts={setAccounts} setShowImport={setShowImport}/>}
       </div>
 
       {/* ULTIMATE FAN NAV */}
