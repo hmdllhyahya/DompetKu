@@ -1,4 +1,4 @@
-// DompetKu Ultimate Version (Merged V4 & V6.2)
+// DompetKu Ultimate Version (Merged V4 + Gemini Native Carousel)
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
@@ -9,8 +9,8 @@ import {
   Check, Volume2, VolumeX, Coffee, ShoppingCart, ShoppingBag, Car, Zap,
   Heart, BookOpen, Scissors, Briefcase, Gift, TrendingUp, MoreHorizontal,
   Monitor, Eye, EyeOff, ArrowDownLeft, ArrowUpRight,
-  PiggyBank, Receipt, Star, Sliders, ChevronRight,
-  ExternalLink, MapPin, Film, Train, Bus, TrendingDown, Calendar, Clock
+  PiggyBank, Receipt, Star, Sliders,
+  ExternalLink, MapPin, Film, Train, Bus, Calendar, Clock
 } from "lucide-react";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
@@ -184,7 +184,6 @@ const nowTime   = () => new Date().toTimeString().slice(0,5);
 const startOfWeek  = () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
 const startOfMonth = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; };
 const daysLeftMonth= () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate()-d.getDate()+1; };
-const daysInMonth  = () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); };
 const greeting  = () => { const h=new Date().getHours(); return h<12?"Selamat Pagi":h<15?"Selamat Siang":h<18?"Selamat Sore":"Selamat Malam"; };
 const fmtDate   = () => { const d=new Date(); return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"2-digit"}); };
 const labelDate = s => {
@@ -678,7 +677,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
 
 // ─── ACCOUNT DETAIL SCREEN ────────────────────────────────────────────────────
 function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAccount }) {
-  const txns   = [...transactions].filter(t=>t.accountId===account.id).sort((a,b)=>(b.date+b.time||"")-(a.date+a.time||""));
+  const txns   = [...transactions].filter(t=>t.accountId===account.id).sort((a,b)=>(b.date+(b.time||""))-(a.date+(a.time||"")));
   const income  = txns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const expense = txns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const grad    = getAccGrad(account,accIdx);
@@ -727,7 +726,6 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
 // ─── HOME SCREEN ──────────────────────────────────────────────────────────────
 function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, savedPct, setSavedPct, userName, userAvatar, setTab, setTxnFilter, setSelectedAcc, hidden, setHidden, onTxnClick }) {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
-  const [carouselIdx,     setCarouselIdx]     = useState(0);
 
   const totalBalance = accounts.reduce((s,a)=>s+a.balance,0);
   const totalIncome  = transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
@@ -738,14 +736,11 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
   const show         = v => hidden ? mask(v) : fmt(v);
   const recent       = [...transactions].sort((a,b)=>(b.date+(b.time||""))-(a.date+(a.time||""))).slice(0,5);
 
-  const monthTxns     = transactions.filter(t=>t.type==="expense"&&t.date>=startOfMonth());
-  const daysPassed    = daysInMonth() - dLeft;
-  const dailyAvg      = daysPassed > 0 ? monthTxns.reduce((s,t)=>s+t.amount,0) / daysPassed : 0;
-  const predictedEndBalance = totalBalance - (dailyAvg * dLeft);
-  const daysTillBroke = dailyAvg > 0 ? Math.floor(totalBalance / dailyAvg) : Infinity;
-  const brokeDateStr  = dailyAvg > 0 ? new Date(Date.now() + daysTillBroke * 86400000).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"2-digit"}) : null;
-
-  const carouselCards = [ { type:"budget" }, { type:"predictor" } ];
+  // Predictor logic (Gemini native scroll style)
+  const daysPassed = new Date().getDate();
+  const avgDailyExp = daysPassed > 0 ? totalExpense / daysPassed : 0;
+  const estEndBal = Math.max(0, totalBalance - (avgDailyExp * dLeft));
+  const estZeroDays = avgDailyExp > 0 ? Math.floor(totalBalance / avgDailyExp) : "999+";
 
   return (
     <div style={{padding:"0 16px 16px"}}>
@@ -774,52 +769,44 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         </div>
       </div>
 
-      <div style={{position:"relative",marginBottom:12}}>
-        <div style={{display:"flex",gap:5,justifyContent:"center",marginBottom:8}}>
-          {carouselCards.map((_,i)=><div key={i} onClick={()=>setCarouselIdx(i)} style={{width:i===carouselIdx?18:6,height:6,borderRadius:3,background:i===carouselIdx?G:"#d1d5db",transition:"width .25s",cursor:"pointer"}}/>)}
-        </div>
-        <div style={{overflow:"hidden"}}>
-          <div style={{display:"flex",transition:"transform .3s ease",transform:`translateX(${-carouselIdx*100}%)`}}>
-            <div style={{minWidth:"100%"}}>
-              <Card style={{marginBottom:0}}>
-                <Row style={{marginBottom:12}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Monthly Budget</p><button onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button></Row>
-                <div style={{display:"flex",alignItems:"center",gap:14}}>
-                  <div style={{position:"relative",width:72,height:72,flexShrink:0}}>
-                    <svg width="72" height="72" style={{transform:"rotate(-90deg)"}}><circle cx="36" cy="36" r="28" fill="none" stroke="#f1f5f9" strokeWidth="8"/><circle cx="36" cy="36" r="28" fill="none" stroke={budgetPct>=90?"#ef4444":budgetPct>=70?"#f59e0b":G} strokeWidth="8" strokeDasharray={`${2*Math.PI*28*(budgetPct/100)} ${2*Math.PI*28}`} strokeLinecap="round"/></svg>
-                    <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:12,fontWeight:800,color:"#111"}}>{budgetPct}%</span></div>
-                  </div>
-                  <div style={{flex:1}}>
-                    <Row style={{marginBottom:4}}><span style={{fontSize:12,color:"#9ca3af"}}>Terpakai</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(totalExpense)}</span></Row>
-                    <Row style={{marginBottom:8}}><span style={{fontSize:12,color:"#9ca3af"}}>Limit</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(monthlyBudget)}</span></Row>
-                    <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/dLeft))):fmt(Math.max(0,Math.floor(budgetLeft/dLeft)))} / hari`}</p>
-                  </div>
-                </div>
-              </Card>
+      {/* Gemini Native Scroll Carousel */}
+      <div style={{display:"flex", gap:12, overflowX:"auto", paddingBottom:10, scrollbarWidth:"none", snapType:"x mandatory"}}>
+        {/* Budget Card */}
+        <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
+          <Card style={{height:"100%", marginBottom:0}}>
+            <Row style={{marginBottom:12}}>
+              <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Monthly Budget</p>
+              <button onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
+            </Row>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <div style={{position:"relative",width:64,height:64,flexShrink:0}}>
+                <svg width="64" height="64" style={{transform:"rotate(-90deg)"}}>
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#f1f5f9" strokeWidth="8"/>
+                  <circle cx="32" cy="32" r="24" fill="none" stroke={budgetPct>=90?"#ef4444":budgetPct>=70?"#f59e0b":G} strokeWidth="8" strokeDasharray={`${2*Math.PI*24*(budgetPct/100)} ${2*Math.PI*24}`} strokeLinecap="round"/>
+                </svg>
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:11,fontWeight:800,color:"#111"}}>{budgetPct}%</span></div>
+              </div>
+              <div style={{flex:1}}>
+                <Row style={{marginBottom:4}}><span style={{fontSize:12,color:"#9ca3af"}}>Terpakai</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(totalExpense)}</span></Row>
+                <Row style={{marginBottom:8}}><span style={{fontSize:12,color:"#9ca3af"}}>Limit</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(monthlyBudget)}</span></Row>
+                <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/dLeft))):fmt(Math.max(0,Math.floor(budgetLeft/dLeft)))} / hari`}</p>
+              </div>
             </div>
-            <div style={{minWidth:"100%"}}>
-              <Card style={{marginBottom:0,background:"linear-gradient(135deg,#1e1b4b,#312e81)"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                  <div style={{width:28,height:28,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><TrendingDown size={14} color="#a5b4fc"/></div>
-                  <p style={{margin:0,fontSize:13,fontWeight:800,color:"#fff"}}>Prediksi Keuangan</p>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <div style={{background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px 12px"}}>
-                    <p style={{color:"rgba(255,255,255,0.6)",fontSize:9,fontWeight:700,margin:"0 0 4px",letterSpacing:.5}}>PREDIKSI AKHIR BULAN</p>
-                    <p style={{color:predictedEndBalance>=0?"#86efac":"#fca5a5",fontSize:14,fontWeight:800,margin:0}}>{hidden?mask(Math.abs(predictedEndBalance)):fmt(predictedEndBalance)}</p>
-                    <p style={{color:"rgba(255,255,255,0.5)",fontSize:10,margin:"3px 0 0"}}>{predictedEndBalance<0?"⚠ Perkiraan defisit":"Estimasi sisa"}</p>
-                  </div>
-                  <div style={{background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px 12px"}}>
-                    <p style={{color:"rgba(255,255,255,0.6)",fontSize:9,fontWeight:700,margin:"0 0 4px",letterSpacing:.5}}>ASET HABIS PERKIRAAN</p>
-                    {daysTillBroke===Infinity?<p style={{color:"#86efac",fontSize:13,fontWeight:700,margin:0}}>Cukup aman 🎉</p>:<><p style={{color:"#fbbf24",fontSize:14,fontWeight:800,margin:0}}>{brokeDateStr}</p><p style={{color:"rgba(255,255,255,0.5)",fontSize:10,margin:"3px 0 0"}}>{daysTillBroke} hari lagi</p></>}
-                  </div>
-                </div>
-                <div style={{marginTop:10,background:"rgba(255,255,255,0.06)",borderRadius:10,padding:"8px 12px"}}><Row><span style={{color:"rgba(255,255,255,0.6)",fontSize:10}}>Rata-rata pengeluaran/hari</span><span style={{color:"#fff",fontSize:11,fontWeight:700}}>{hidden?mask(dailyAvg):fmt(dailyAvg)}</span></Row></div>
-              </Card>
-            </div>
-          </div>
+          </Card>
         </div>
-        <div style={{position:"absolute",top:"50%",left:-4,transform:"translateY(-50%)"}}><button onClick={()=>setCarouselIdx(p=>Math.max(0,p-1))} style={{background:"#fff",border:"none",borderRadius:"50%",width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.12)",opacity:carouselIdx===0?0.3:1}}><ChevronLeft size={13}/></button></div>
-        <div style={{position:"absolute",top:"50%",right:-4,transform:"translateY(-50%)"}}><button onClick={()=>setCarouselIdx(p=>Math.min(carouselCards.length-1,p+1))} style={{background:"#fff",border:"none",borderRadius:"50%",width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.12)",opacity:carouselIdx===carouselCards.length-1?0.3:1}}><ChevronRight size={13}/></button></div>
+        
+        {/* Predictor Card */}
+        <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
+           <Card style={{height:"100%", marginBottom:0}}>
+             <Row style={{marginBottom:10}}>
+                <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Budget Predictor</p>
+                <TrendingUp size={16} color={G}/>
+             </Row>
+             <p style={{fontSize:11, color:"#6b7280", margin:"0 0 8px", lineHeight:1.4}}>Berdasarkan pengeluaran harian {fmtShort(avgDailyExp)}, di akhir bulan saldo sisa:</p>
+             <p style={{fontSize:20, fontWeight:800, color:estEndBal>0?G:"#ef4444", margin:"0 0 10px"}}>{show(estEndBal)}</p>
+             <p style={{fontSize:11, color:"#9ca3af", margin:0}}>Asumsi 0 income, uang akan habis dalam <b style={{color:"#111"}}>{estZeroDays} hari</b>.</p>
+           </Card>
+        </div>
       </div>
 
       <Row style={{marginBottom:10}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Akun Saya</p><button onClick={()=>setTab("accounts")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
@@ -1109,7 +1096,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       </Card>
       <Card style={{padding:"4px 0"}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.0 (Ultimate)"/>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.1 (Ultimate Edition)"/>
       </Card>
       {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
       {showConfirm&&<ConfirmDialog title="Hapus Semua Data?" sub="Semua transaksi, akun, dan pengaturan akan dihapus. Tidak bisa dibatalkan." onConfirm={()=>{setTransactions([]);setAccounts([]);setShowConfirm(false);}} onCancel={()=>setShowConfirm(false)}/>}
