@@ -1,4 +1,4 @@
-// DompetKu Ultimate Version (Merged V4 + Gemini Native Carousel + Biometrics Fix)
+// DompetKu Ultimate Version (Audited & Patched)
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
@@ -16,7 +16,7 @@ import {
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const G = "#2DAB7F", G2 = "#1d8a63", GL = "#E8F7F1", GM = "#b6e4d0", BG = "#F0F3F7";
 
-// ─── BRAND MAP (dual-color gradients with brand primary + accent) ─────────────
+// ─── BRAND MAP ────────────────────────────────────────────────────────────────
 const BRAND_MAP = {
   bca:       "linear-gradient(135deg,#0053A0,#2196F3)",
   bri:       "linear-gradient(135deg,#003F88,#1976D2)",
@@ -106,8 +106,8 @@ const SMART_RULES = [
   { kw:["transfer","kiriman","hadiah","kado"], cat:"Hadiah" },
   { kw:["investasi","saham","reksa","deposito","dividen","bunga"], cat:"Investasi" },
 ];
-const CATS_EXP = ["Makan & Minum","Belanja Harian","Belanja Online","Transportasi","Hiburan","Tagihan","Kesehatan","Pendidikan","Tempat Tinggal","Perawatan","Lainnya"];
-const CATS_INC = ["Gaji","Freelance","Hadiah","Investasi","Lainnya"];
+const CATS_EXP = ["Makan & Minum","Belanja Harian","Belanja Online","Transportasi","Hiburan","Tagihan","Kesehatan","Pendidikan","Tempat Tinggal","Perawatan","Penyesuaian Saldo","Lainnya"];
+const CATS_INC = ["Gaji","Freelance","Hadiah","Investasi","Penyesuaian Saldo","Lainnya"];
 const CAT_ICON = (cat,sz=16,col="currentColor") => {
   const p={size:sz,strokeWidth:1.7,color:col};
   return ({
@@ -140,7 +140,6 @@ const smartDetect = note => {
   return null;
 };
 
-// Context-aware detail fields per transaction
 const getTxnDetailFields = (txn) => {
   const note = (txn.note||"").toLowerCase();
   const cat  = txn.category||"";
@@ -179,22 +178,26 @@ const getTxnDetailFields = (txn) => {
 const fmt       = n => "Rp " + Math.abs(n).toLocaleString("id-ID");
 const fmtShort  = n => n>=1e9?(n/1e9).toFixed(1)+"M":n>=1e6?(n/1e6).toFixed(1)+"Jt":n>=1e3?(n/1e3).toFixed(0)+"K":String(n);
 const mask      = n => "Rp " + "•".repeat(Math.min(7,String(Math.round(n)).length));
-const todayStr  = () => new Date().toISOString().slice(0,10);
+
+// Timezone safe dates
+const getLocalISOString = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+const todayStr  = () => getLocalISOString();
 const nowTime   = () => new Date().toTimeString().slice(0,5);
-const startOfWeek  = () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
+const startOfWeek  = () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return getLocalISOString(d); };
 const startOfMonth = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; };
-const daysLeftMonth= () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate()-d.getDate()+1; };
-const daysInMonth  = () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); };
+
+const daysLeftMonth = () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth()+1,0).getDate() - d.getDate(); };
 const greeting  = () => { const h=new Date().getHours(); return h<12?"Selamat Pagi":h<15?"Selamat Siang":h<18?"Selamat Sore":"Selamat Malam"; };
 const fmtDate   = () => { const d=new Date(); return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"2-digit"}); };
 const labelDate = s => {
   const td=todayStr(), yd=new Date(); yd.setDate(yd.getDate()-1);
   if(s===td) return "HARI INI";
-  if(s===yd.toISOString().slice(0,10)) return "KEMARIN";
+  if(s===getLocalISOString(yd)) return "KEMARIN";
   return new Date(s).toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"}).toUpperCase();
 };
 const fmtNum    = raw => { const n=parseInt((raw||"").replace(/\D/g,"")||"0"); return n?n.toLocaleString("id-ID"):""; };
 const parseNum  = str => parseInt((str||"").replace(/\./g,"").replace(/,/g,"")||"0");
+const sortByDateDesc = (a, b) => new Date(`${b.date}T${b.time||"00:00"}`).getTime() - new Date(`${a.date}T${a.time||"00:00"}`).getTime();
 
 // localStorage
 const lsGet = (k,def) => { try { const v=localStorage.getItem(k); return v!=null?JSON.parse(v):def; } catch { return def; } };
@@ -217,31 +220,19 @@ const playTxnSound = type => {
   try { const ctx=new(window.AudioContext||window.webkitAudioContext)(); const osc=ctx.createOscillator(); const gain=ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.type="sine"; if(type==="expense"){osc.frequency.setValueAtTime(523,ctx.currentTime);osc.frequency.exponentialRampToValueAtTime(262,ctx.currentTime+0.35);}else{osc.frequency.setValueAtTime(330,ctx.currentTime);osc.frequency.exponentialRampToValueAtTime(660,ctx.currentTime+0.35);} gain.gain.setValueAtTime(0.22,ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4); osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.4); } catch {}
 };
 
-// ─── DOMPETKU LOGO SVG ────────────────────────────────────────────────────────
-const DompetKuLogo = ({ size=28, color="#fff" }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <rect x="2" y="9" width="21" height="15" rx="3.5" stroke={color} strokeWidth="2"/>
-    <path d="M15 14h8a2 2 0 010 4h-8" stroke={color} strokeWidth="1.9" fill="none"/>
-    <circle cx="19.5" cy="16" r="1.4" fill={color}/>
-    <path d="M24 21.5 C27 19.5 29.5 17 29 14" stroke={color} strokeWidth="2" strokeLinecap="round"/>
-    <path d="M24.5 18 C27 16 29 13.5 28.5 11" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-    <path d="M24 14.5 C26 12.5 27 10 26 8.5" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
-  </svg>
-);
-
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
 const Card    = ({children,style={}}) => <div style={{background:"#fff",borderRadius:18,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:12,...style}}>{children}</div>;
 const Row     = ({children,style={}}) => <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",...style}}>{children}</div>;
-const BtnG    = ({onClick,children,style={},disabled=false}) => <button onClick={onClick} disabled={disabled} style={{width:"100%",padding:"15px",background:disabled?"#d1d5db":G,border:"none",borderRadius:16,color:"#fff",fontSize:15,fontWeight:700,cursor:disabled?"not-allowed":"pointer",boxShadow:disabled?"none":`0 6px 20px ${G}40`,...style}}>{children}</button>;
+const BtnG    = ({onClick,children,style={},disabled=false}) => <button type="button" onClick={onClick} disabled={disabled} style={{width:"100%",padding:"15px",background:disabled?"#d1d5db":G,border:"none",borderRadius:16,color:"#fff",fontSize:15,fontWeight:700,cursor:disabled?"not-allowed":"pointer",boxShadow:disabled?"none":`0 6px 20px ${G}40`,...style}}>{children}</button>;
 const Inp     = ({label,children,mb=10,style={}}) => <div style={{background:"#fff",borderRadius:14,padding:"12px 14px",marginBottom:mb,boxShadow:"0 1px 4px rgba(0,0,0,0.05)",...style}}>{label&&<p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700,letterSpacing:.6}}>{label}</p>}{children}</div>;
-const Tog     = ({on,onToggle}) => <div onClick={onToggle} style={{width:44,height:24,borderRadius:99,background:on?G:"#d1d5db",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:3,left:on?23:3,width:18,height:18,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.2)",transition:"left .2s"}}/></div>;
+const Tog     = ({on,onToggle}) => <button type="button" onClick={onToggle} style={{width:44,height:24,borderRadius:99,background:on?G:"#d1d5db",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0,border:"none",outline:"none"}}><div style={{position:"absolute",top:3,left:on?23:3,width:18,height:18,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.2)",transition:"left .2s"}}/></button>;
 const CatBub  = ({cat,size=44}) => <div style={{width:size,height:size,borderRadius:size*0.32,background:CAT_BG[cat]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:CAT_COLORS[cat]||"#9ca3af"}}>{CAT_ICON(cat,size*0.42)}</div>;
 const SRow    = ({icon,bg=GL,title,sub,right,danger=false}) => <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderBottom:"1px solid #f8fafc"}}><div style={{width:38,height:38,borderRadius:12,background:bg,display:"flex",alignItems:"center",justifyContent:"center",color:danger?"#ef4444":G,flexShrink:0}}>{icon}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,fontWeight:600,color:danger?"#ef4444":"#111"}}>{title}</p>{sub&&<p style={{margin:"2px 0 0",fontSize:11,color:"#9ca3af"}}>{sub}</p>}</div>{right}</div>;
 
 const BottomSheet = ({onClose,title,children}) => (
   <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"flex-end",zIndex:200,backdropFilter:"blur(4px)"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
     <div style={{background:"#f8fafc",width:"100%",maxWidth:430,margin:"0 auto",borderRadius:"24px 24px 0 0",padding:"20px 16px 36px",maxHeight:"93vh",overflowY:"auto"}}>
-      <Row style={{marginBottom:16}}><h2 style={{margin:0,fontSize:17,fontWeight:800,color:"#111"}}>{title}</h2><button onClick={onClose} style={{background:"#e5e7eb",border:"none",borderRadius:9,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><X size={14}/></button></Row>
+      <Row style={{marginBottom:16}}><h2 style={{margin:0,fontSize:17,fontWeight:800,color:"#111"}}>{title}</h2><button type="button" onClick={onClose} style={{background:"#e5e7eb",border:"none",borderRadius:9,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><X size={14}/></button></Row>
       {children}
     </div>
   </div>
@@ -254,12 +245,26 @@ const ConfirmDialog = ({title,sub,onConfirm,onCancel,danger=true,confirmLabel="Y
       <p style={{fontSize:16,fontWeight:800,color:"#111",margin:"0 0 8px"}}>{title}</p>
       <p style={{fontSize:13,color:"#6b7280",marginBottom:20}}>{sub}</p>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        <button onClick={onCancel} style={{padding:"13px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,fontWeight:700,cursor:"pointer"}}>Batal</button>
-        <button onClick={onConfirm} style={{padding:"13px",background:danger?"#ef4444":G,border:"none",borderRadius:14,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>{confirmLabel}</button>
+        <button type="button" onClick={onCancel} style={{padding:"13px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,fontWeight:700,cursor:"pointer"}}>Batal</button>
+        <button type="button" onClick={onConfirm} style={{padding:"13px",background:danger?"#ef4444":G,border:"none",borderRadius:14,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>{confirmLabel}</button>
       </div>
     </div>
   </div>
 );
+
+// ─── DOMPETKU LOGO SVG ────────────────────────────────────────────────────────
+function DompetKuLogo({ size=28, color="#fff" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <rect x="2" y="9" width="21" height="15" rx="3.5" stroke={color} strokeWidth="2"/>
+      <path d="M15 14h8a2 2 0 010 4h-8" stroke={color} strokeWidth="1.9" fill="none"/>
+      <circle cx="19.5" cy="16" r="1.4" fill={color}/>
+      <path d="M24 21.5 C27 19.5 29.5 17 29 14" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M24.5 18 C27 16 29 13.5 28.5 11" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M24 14.5 C26 12.5 27 10 26 8.5" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+    </svg>
+  );
+}
 
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
 function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, onCancel }) {
@@ -274,15 +279,11 @@ function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, o
       else { const n=confirm+d; setConfirm(n); if(n.length===4){if(n===input){hashPin(n).then(h=>onSetPin(h));}else{setErr("PIN tidak cocok");setInput("");setConfirm("");setStep("enter");}} }
     } else {
       const n=input+d; setInput(n);
-      if(n.length===4){ hashPin(n).then(h=>{if(h===savedHash||n===savedHash){onUnlock();}else{setErr("PIN salah");setInput("");}}); }
+      if(n.length===4){ hashPin(n).then(h=>{if(h===savedHash){onUnlock();}else{setErr("PIN salah");setInput("");}}); }
     }
   };
   const del = () => { if(step==="confirm")setConfirm(c=>c.slice(0,-1)); else setInput(i=>i.slice(0,-1)); };
-  
-  const handleBio = () => {
-    // Simulasi native auth (langsung tembus untuk mockup web)
-    onUnlock();
-  };
+  const handleBio = () => { onUnlock(); };
 
   const cur = step==="confirm"?confirm:input;
   return (
@@ -295,13 +296,13 @@ function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, o
       
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,width:240,marginTop:16}}>
         {[1,2,3,4,5,6,7,8,9, (mode==="unlock" && bioEnabled ? "BIO" : ""), 0, "⌫"].map((d,i)=>(
-          <button key={i} onClick={()=>d==="⌫"?del():d==="BIO"?handleBio():d!==""?handleDigit(String(d)):null} disabled={d===""}
+          <button type="button" key={i} onClick={()=>d==="⌫"?del():d==="BIO"?handleBio():d!==""?handleDigit(String(d)):null} disabled={d===""}
             style={{height:64,borderRadius:16,background:d==="⌫"||d==="BIO"?"rgba(255,255,255,0.15)":d===""?"transparent":"rgba(255,255,255,0.2)",border:"none",color:"#fff",fontSize:d==="⌫"?18:22,fontWeight:700,cursor:d===""?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
             {d==="⌫" ? <Trash2 size={20} strokeWidth={2}/> : d==="BIO" ? <Fingerprint size={26} strokeWidth={1.8}/> : d}
           </button>
         ))}
       </div>
-      {onCancel&&<button onClick={onCancel} style={{marginTop:24,background:"none",border:"none",color:"rgba(255,255,255,0.7)",fontSize:14,cursor:"pointer"}}>Batal</button>}
+      {onCancel&&<button type="button" onClick={onCancel} style={{marginTop:24,background:"none",border:"none",color:"rgba(255,255,255,0.7)",fontSize:14,cursor:"pointer"}}>Batal</button>}
     </div>
   );
 }
@@ -350,7 +351,7 @@ function BudgetModal({ totalBalance, currentBudget, savedPct, onApply, onClose }
   const saving    = Math.round(totalBalance * savePct / 100);
   const spendable = Math.max(0, totalBalance - saving);
   const sugDaily  = daysLeft > 0 ? Math.floor(spendable / daysLeft) : 0;
-  const finalBudget = useCustom ? (parseNum(custom)||0) : spendable;
+  const finalBudget = useCustom ? Math.max(0, parseNum(custom)||0) : spendable;
   return (
     <BottomSheet onClose={onClose} title="Atur Budget Bulanan">
       <Card style={{background:`linear-gradient(135deg,${G},${G2})`,marginBottom:12}}>
@@ -421,7 +422,7 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
     <BottomSheet onClose={onClose} title={isNew?"Tambah Akun":"Edit Akun"}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
         {ACC_TYPES.map(t=>(
-          <button key={t.type} onClick={()=>{s("type",t.type);setShowCustom(false);s("name","");}}
+          <button type="button" key={t.type} onClick={()=>{s("type",t.type);setShowCustom(false);s("name","");}}
             style={{padding:"10px 8px",background:acc.type===t.type?"#fff":"#f1f5f9",border:`1.5px solid ${acc.type===t.type?G:"#e5e7eb"}`,borderRadius:12,color:acc.type===t.type?G:"#6b7280",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:7,boxShadow:acc.type===t.type?"0 2px 8px rgba(0,0,0,0.08)":"none"}}>
             <div style={{color:acc.type===t.type?G:"#9ca3af"}}><t.Icon s={17}/></div>{t.label}
           </button>
@@ -440,7 +441,7 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
       <Card style={{marginBottom:14,padding:"12px 14px"}}>
         <Row style={{marginBottom:10}}>
           <p style={{margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:.5}}>TAMPILAN KARTU</p>
-          <button onClick={()=>setShowColorPicker(p=>!p)} style={{background:showColorPicker?GL:"#f1f5f9",border:"none",borderRadius:8,padding:"4px 10px",color:showColorPicker?G:"#6b7280",fontSize:11,fontWeight:600,cursor:"pointer"}}>{showColorPicker?"Tutup":"Kustomisasi"}</button>
+          <button type="button" onClick={()=>setShowColorPicker(p=>!p)} style={{background:showColorPicker?GL:"#f1f5f9",border:"none",borderRadius:8,padding:"4px 10px",color:showColorPicker?G:"#6b7280",fontSize:11,fontWeight:600,cursor:"pointer"}}>{showColorPicker?"Tutup":"Kustomisasi"}</button>
         </Row>
         {detectedGrad&&<div style={{background:GL,borderRadius:9,padding:"6px 11px",marginBottom:8,display:"flex",alignItems:"center",gap:7}}><Check size={12} color={G}/><span style={{fontSize:11,color:G,fontWeight:600}}>Brand {finalName} terdeteksi</span></div>}
         
@@ -449,7 +450,7 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
             <p style={{margin:"0 0 6px",fontSize:10,color:"#9ca3af",fontWeight:700}}>PRESET GRADIEN</p>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
               {GRADIENT_PRESETS.map(([c1,c2],i)=>(
-                <button key={i} onClick={()=>applyPreset([c1,c2])} style={{width:32,height:32,borderRadius:9,background:`linear-gradient(135deg,${c1},${c2})`,border:"none",cursor:"pointer",flexShrink:0,outline:acc.customGrad===`linear-gradient(135deg,${c1},${c2})`?"3px solid "+G:"none",boxShadow:"0 2px 6px rgba(0,0,0,0.15)"}}/>
+                <button type="button" key={i} onClick={()=>applyPreset([c1,c2])} style={{width:32,height:32,borderRadius:9,background:`linear-gradient(135deg,${c1},${c2})`,border:"none",cursor:"pointer",flexShrink:0,outline:acc.customGrad===`linear-gradient(135deg,${c1},${c2})`?"3px solid "+G:"none",boxShadow:"0 2px 6px rgba(0,0,0,0.15)"}}/>
               ))}
             </div>
             <p style={{margin:"0 0 6px",fontSize:10,color:"#9ca3af",fontWeight:700}}>COLOR PICKER KUSTOM</p>
@@ -464,13 +465,13 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
                 </div>
               ))}
             </div>
-            <button onClick={applyGradient} style={{width:"100%",padding:"9px",background:`linear-gradient(135deg,${col1},${col2})`,border:"none",borderRadius:11,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",marginBottom:10}}>Terapkan Gradien Ini</button>
+            <button type="button" onClick={applyGradient} style={{width:"100%",padding:"9px",background:`linear-gradient(135deg,${col1},${col2})`,border:"none",borderRadius:11,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",marginBottom:10}}>Terapkan Gradien Ini</button>
             <Row style={{marginBottom:6}}>
               <span style={{fontSize:11,color:"#6b7280"}}>Ikon kustom (gambar)</span>
-              <button onClick={()=>iconRef.current.click()} style={{background:GL,border:"none",borderRadius:9,padding:"5px 10px",color:G,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><Upload size={12}/> Upload</button>
+              <button type="button" onClick={()=>iconRef.current.click()} style={{background:GL,border:"none",borderRadius:9,padding:"5px 10px",color:G,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><Upload size={12}/> Upload</button>
             </Row>
             <input ref={iconRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleIcon}/>
-            {acc.customGrad&&<button onClick={()=>s("customGrad","")} style={{background:"none",border:"none",color:"#ef4444",fontSize:11,cursor:"pointer",fontWeight:600}}>✕ Reset ke default</button>}
+            {acc.customGrad&&<button type="button" onClick={()=>s("customGrad","")} style={{background:"none",border:"none",color:"#ef4444",fontSize:11,cursor:"pointer",fontWeight:600}}>✕ Reset ke default</button>}
           </div>
         )}
         <div style={{background:curGrad,borderRadius:12,padding:"14px",marginTop:8,display:"flex",alignItems:"center",gap:12}}>
@@ -510,7 +511,11 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
   const [showDel, setShowDel] = useState(false);
   const [attachSrcs, setAttachSrcs] = useState({});
 
-  useEffect(()=>{ (txn.attachmentMeta||[]).forEach(a=>{ IDB.get(a.id).then(d=>d&&setAttachSrcs(p=>({...p,[a.id]:d}))).catch(()=>{}); }); },[txn]);
+  useEffect(()=>{
+    let active = true;
+    (txn.attachmentMeta||[]).forEach(a=>{ IDB.get(a.id).then(d=>{if(active&&d)setAttachSrcs(p=>({...p,[a.id]:d}));}).catch(()=>{}); });
+    return () => { active = false; };
+  },[txn]);
   const save = () => { onEdit({...txn, details}); setEditing(false); };
   const grad = acc ? getAccGrad(acc, accounts.indexOf(acc)) : `linear-gradient(135deg,${G},${G2})`;
 
@@ -518,10 +523,10 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:210,display:"flex",alignItems:"flex-end",backdropFilter:"blur(4px)"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{background:"#f8fafc",width:"100%",maxWidth:430,margin:"0 auto",borderRadius:"24px 24px 0 0",maxHeight:"92vh",overflowY:"auto",paddingBottom:32}}>
         <div style={{background:grad,borderRadius:"24px 24px 0 0",padding:"20px 18px 24px",position:"relative"}}>
-          <button onClick={onClose} style={{position:"absolute",top:16,left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:9,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><X size={16}/></button>
+          <button type="button" onClick={onClose} style={{position:"absolute",top:16,left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:9,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><X size={16}/></button>
           
           <div style={{textAlign:"center",paddingTop:8}}>
-            {/* FIX: Centered container for category icon to prevent overlapping with X */}
+            {/* FIX: Centered container to prevent overlap */}
             <div style={{display:"flex", justifyContent:"center", marginBottom: 10}}>
               <CatBub cat={txn.category} size={56}/>
             </div>
@@ -543,7 +548,7 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
           <Card style={{marginBottom:10}}>
             <Row style={{marginBottom:editing?10:0}}>
               <p style={{margin:0,fontSize:12,fontWeight:700,color:"#111"}}>Detail Tambahan</p>
-              <button onClick={()=>editing?save():setEditing(true)} style={{background:editing?G:GL,border:"none",borderRadius:8,padding:"5px 12px",color:editing?"#fff":G,fontSize:11,fontWeight:700,cursor:"pointer"}}>{editing?"Simpan":"Edit"}</button>
+              <button type="button" onClick={()=>editing?save():setEditing(true)} style={{background:editing?G:GL,border:"none",borderRadius:8,padding:"5px 12px",color:editing?"#fff":G,fontSize:11,fontWeight:700,cursor:"pointer"}}>{editing?"Simpan":"Edit"}</button>
             </Row>
             {fields.map(f=>(
               <div key={f.key} style={{marginBottom:8}}>
@@ -565,8 +570,8 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
             </div>
           </Card>}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:4}}>
-            <button onClick={()=>onEdit(txn)} style={{padding:"13px",background:GL,border:"none",borderRadius:14,color:G,fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={15}/>Edit</button>
-            <button onClick={()=>setShowDel(true)} style={{padding:"13px",background:"#fef2f2",border:"none",borderRadius:14,color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Trash2 size={15}/>Hapus</button>
+            <button type="button" onClick={()=>onEdit(txn)} style={{padding:"13px",background:GL,border:"none",borderRadius:14,color:G,fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={15}/>Edit</button>
+            <button type="button" onClick={()=>setShowDel(true)} style={{padding:"13px",background:"#fef2f2",border:"none",borderRadius:14,color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Trash2 size={15}/>Hapus</button>
           </div>
         </div>
       </div>
@@ -585,6 +590,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
 
   const handleNote = v => { s("note",v); const d=smartDetect(v); setDetected(d); if(d)setForm(f=>({...f,note:v,category:d.cat})); };
   const handleAmt  = e => { const raw=e.target.value.replace(/\D/g,""); s("amountStr",raw?parseInt(raw).toLocaleString("id-ID"):""); };
+  
   const handleFile = async e => {
     isPickingFile.current=false;
     const files=Array.from(e.target.files); const newMeta=[];
@@ -609,7 +615,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
     <BottomSheet onClose={onClose} title={isEdit?"Edit Transaksi":"Catat Transaksi"}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,marginBottom:14,background:"#e5e7eb",borderRadius:14,padding:4}}>
         {["expense","income"].map(type=>(
-          <button key={type} onClick={()=>setForm(f=>({...f,type,category:type==="expense"?"Makan & Minum":"Gaji"}))} style={{padding:"10px",border:"none",borderRadius:11,background:form.type===type?"#fff":"transparent",color:form.type===type?"#111":"#9ca3af",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:form.type===type?"0 1px 4px rgba(0,0,0,0.08)":"none"}}>{type==="expense"?"Pengeluaran":"Pemasukan"}</button>
+          <button type="button" key={type} onClick={()=>setForm(f=>({...f,type,category:type==="expense"?"Makan & Minum":"Gaji"}))} style={{padding:"10px",border:"none",borderRadius:11,background:form.type===type?"#fff":"transparent",color:form.type===type?"#111":"#9ca3af",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:form.type===type?"0 1px 4px rgba(0,0,0,0.08)":"none"}}>{type==="expense"?"Pengeluaran":"Pemasukan"}</button>
         ))}
       </div>
       <Inp label="JUMLAH (RP)"><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span><input inputMode="numeric" placeholder="0" value={form.amountStr||""} onChange={handleAmt} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:28,fontWeight:800,color:"#111"}}/></div></Inp>
@@ -618,7 +624,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
       <Inp label="KATEGORI">
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
           {cats.map(c=>(
-            <button key={c} onClick={()=>s("category",c)} style={{padding:"8px 4px",background:form.category===c?GL:"#f8fafc",border:`1.5px solid ${form.category===c?G:"#f1f5f9"}`,borderRadius:10,color:form.category===c?G:"#9ca3af",fontSize:9,fontWeight:600,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{color:form.category===c?G:CAT_COLORS[c]||"#9ca3af"}}>{CAT_ICON(c,17)}</span><span style={{textAlign:"center",lineHeight:1.2,color:form.category===c?G:"#6b7280",wordBreak:"break-word",hyphens:"auto"}}>{c==="Makan & Minum"?"Makan":c==="Belanja Harian"?"B.Harian":c==="Belanja Online"?"B.Online":c==="Tempat Tinggal"?"Tempat Tgl":c.split(" ")[0]}</span></button>
+            <button type="button" key={c} onClick={()=>s("category",c)} style={{padding:"8px 4px",background:form.category===c?GL:"#f8fafc",border:`1.5px solid ${form.category===c?G:"#f1f5f9"}`,borderRadius:10,color:form.category===c?G:"#9ca3af",fontSize:9,fontWeight:600,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{color:form.category===c?G:CAT_COLORS[c]||"#9ca3af"}}>{CAT_ICON(c,17)}</span><span style={{textAlign:"center",lineHeight:1.2,color:form.category===c?G:"#6b7280",wordBreak:"break-word",hyphens:"auto"}}>{c==="Makan & Minum"?"Makan":c==="Belanja Harian"?"B.Harian":c==="Belanja Online"?"B.Online":c==="Tempat Tinggal"?"Tempat Tgl":c==="Penyesuaian Saldo"?"Penyesuaian":c.split(" ")[0]}</span></button>
           ))}
         </div>
       </Inp>
@@ -628,11 +634,11 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
       </div>
       <Inp label="JAM" mb={10}><input type="time" value={form.time||nowTime()} onChange={e=>s("time",e.target.value)} style={{background:"transparent",border:"none",outline:"none",fontSize:14,fontWeight:600,color:"#111",colorScheme:"light"}}/></Inp>
       <Inp label="LAMPIRAN (OPSIONAL)" mb={18}>
-        <Row><p style={{margin:0,fontSize:12,color:"#9ca3af"}}>Foto struk, invoice, dll.</p><button onClick={()=>{isPickingFile.current=true;fileRef.current.click();}} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Upload size={12}/> Tambah</button></Row>
+        <Row><p style={{margin:0,fontSize:12,color:"#9ca3af"}}>Foto struk, dll.</p><button type="button" onClick={()=>{isPickingFile.current=true;fileRef.current.click();}} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Upload size={12}/> Tambah</button></Row>
         <input ref={fileRef} type="file" accept="image/*,.pdf" multiple style={{display:"none"}} onChange={handleFile}/>
         {(form.attachmentMeta||[]).length>0&&(
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-            {form.attachmentMeta.map(a=>(<div key={a.id} style={{position:"relative",width:52,height:52}}><AttachPreview id={a.id} type={a.type}/><button onClick={()=>removeAttachment(a.id)} style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>))}
+            {form.attachmentMeta.map(a=>(<div key={a.id} style={{position:"relative",width:52,height:52}}><AttachPreview id={a.id} type={a.type}/><button type="button" onClick={()=>removeAttachment(a.id)} style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>))}
           </div>
         )}
       </Inp>
@@ -643,7 +649,11 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
 
 function AttachPreview({ id, type }) {
   const [src, setSrc] = useState(null);
-  useEffect(()=>{IDB.get(id).then(d=>d&&setSrc(d)).catch(()=>{});},[id]);
+  useEffect(()=>{
+    let active = true;
+    IDB.get(id).then(d=>{if(active&&d)setSrc(d)}).catch(()=>{});
+    return () => { active = false; };
+  },[id]);
   if(!src)return<div style={{width:52,height:52,borderRadius:9,background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",color:"#9ca3af"}}><Receipt size={18}/></div>;
   if(type?.startsWith("image"))return<img src={src} alt="" style={{width:52,height:52,borderRadius:9,objectFit:"cover"}}/>;
   return<div style={{width:52,height:52,borderRadius:9,background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",color:"#6b7280"}}><Receipt size={20}/></div>;
@@ -655,7 +665,9 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   const ref=useRef();
   const parse=async e=>{
     isPickingFile.current=false;
-    const file=e.target.files[0];if(!file)return;setSt("parsing");
+    const file=e.target.files[0];if(!file)return;
+    if(accounts.length===0){setErr("Silakan buat akun keuangan terlebih dahulu sebelum import.");setSt("error");return;}
+    setSt("parsing");
     try{
       const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:"array"});const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
@@ -669,9 +681,9 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
         const row=rows[i];if(!row||row.every(c=>c===""))continue;
         const amt=parseFloat(String(row[ai]).replace(/[^\d.-]/g,""));if(!amt||isNaN(amt))continue;
         const rt=ti>=0?String(row[ti]).toLowerCase():"";const isInc=rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
-        let pd=todayStr();if(di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=d.toISOString().slice(0,10);}catch{}}
+        let pd=todayStr();if(di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=getLocalISOString(d);}catch{}}
         const rc=ci>=0?String(row[ci]):"";const cat=Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
-        parsed.push({id:Date.now()+i,type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"",accountId:accounts[0]?.id,detected:null,attachmentMeta:[]});
+        parsed.push({id:Date.now()+i,type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"",accountId:accounts[0].id,detected:null,attachmentMeta:[]});
       }
       if(!parsed.length){setErr("Tidak ada data valid.");setSt("error");return;}
       setPreview(parsed);setSt("preview");
@@ -690,20 +702,24 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
 
 // ─── ACCOUNT DETAIL SCREEN ────────────────────────────────────────────────────
 function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAccount }) {
-  const txns   = [...transactions].filter(t=>t.accountId===account.id).sort((a,b)=>(b.date+(b.time||""))-(a.date+(a.time||"")));
+  const txns   = [...transactions].filter(t=>t.accountId===account.id).sort(sortByDateDesc);
   const income  = txns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const expense = txns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const grad    = getAccGrad(account,accIdx);
   const deepLink= getDeepLink(account.name);
   const isLinkable = account.type==="ewallet"||account.type==="debit"||account.type==="credit";
 
-  const openApp = () => { if (!deepLink) return; window.location.href = deepLink.scheme; setTimeout(()=>{ window.location.href=`https://play.google.com/store/apps/details?id=${deepLink.pkg}`; }, 1800); };
+  const openApp = () => {
+    if (!deepLink) return;
+    window.location.href = deepLink.scheme;
+    setTimeout(() => { if (!document.hidden) window.location.href=`https://play.google.com/store/apps/details?id=${deepLink.pkg}`; }, 2000);
+  };
 
   return (
     <div style={{position:"fixed",inset:0,background:BG,zIndex:150,maxWidth:430,margin:"0 auto",overflowY:"auto",paddingBottom:30}}>
       <div style={{background:grad,padding:"calc(env(safe-area-inset-top,0px) + 14px) 16px 24px",position:"relative"}}>
-        <button onClick={onClose} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><ChevronLeft size={20}/></button>
-        <button onClick={onEditAccount} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",right:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Pencil size={15}/></button>
+        <button type="button" onClick={onClose} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><ChevronLeft size={20}/></button>
+        <button type="button" onClick={onEditAccount} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",right:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Pencil size={15}/></button>
         <div style={{textAlign:"center",paddingTop:16}}>
           <div style={{width:54,height:54,borderRadius:16,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",color:"#fff"}}>
             {account.iconImg?<img src={account.iconImg} alt="" style={{width:38,height:38,borderRadius:10,objectFit:"cover"}}/>:(()=>{const T=ACC_TYPES.find(t=>t.type===account.type);return T?<T.Icon s={24}/>:null;})()}
@@ -717,7 +733,7 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
             <div key={x.l} style={{background:"rgba(255,255,255,0.15)",borderRadius:12,padding:"10px 14px",textAlign:"center"}}><p style={{color:"rgba(255,255,255,0.7)",fontSize:10,fontWeight:600,margin:"0 0 3px"}}>{x.l}</p><p style={{color:"#fff",fontSize:13,fontWeight:800,margin:0}}>{fmtShort(x.v)}</p></div>
           ))}
         </div>
-        {isLinkable&&(<button onClick={openApp} style={{width:"100%",marginTop:14,padding:"11px",background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.4)",borderRadius:13,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><ExternalLink size={15}/> Buka {deepLink?.label||"Aplikasi"}</button>)}
+        {isLinkable&&(<button type="button" onClick={openApp} style={{width:"100%",marginTop:14,padding:"11px",background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.4)",borderRadius:13,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><ExternalLink size={15}/> Buka {deepLink?.label||"Aplikasi"}</button>)}
       </div>
       <div style={{padding:"16px 16px 0"}}>
         <p style={{margin:"0 0 10px",fontSize:14,fontWeight:700,color:"#111"}}>Riwayat Transaksi</p>
@@ -745,10 +761,10 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
   const totalExpense = transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const budgetLeft   = monthlyBudget - totalExpense;
   const budgetPct    = Math.min(100,Math.round(totalExpense/Math.max(monthlyBudget,1)*100));
-  const dLeft        = daysLeftMonth();
   const show         = v => hidden ? mask(v) : fmt(v);
-  const recent       = [...transactions].sort((a,b)=>(b.date+(b.time||""))-(a.date+(a.time||""))).slice(0,5);
+  const recent       = [...transactions].sort(sortByDateDesc).slice(0,5);
 
+  const dLeft = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate() - new Date().getDate();
   const daysPassed = new Date().getDate();
   const avgDailyExp = daysPassed > 0 ? totalExpense / daysPassed : 0;
   const estEndBal = Math.max(0, totalBalance - (avgDailyExp * dLeft));
@@ -767,12 +783,12 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         <div style={{position:"absolute",top:-40,right:-40,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
           <p style={{color:"rgba(255,255,255,0.75)",fontSize:12,margin:0}}>Total Balance</p>
-          <button onClick={()=>setHidden(p=>!p)} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:6,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",flexShrink:0}}>{hidden?<EyeOff size={12}/>:<Eye size={12}/>}</button>
+          <button type="button" onClick={()=>setHidden(p=>!p)} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:6,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff",flexShrink:0}}>{hidden?<EyeOff size={12}/>:<Eye size={12}/>}</button>
         </div>
         <p style={{color:"#fff",fontSize:28,fontWeight:800,margin:"0 0 18px",letterSpacing:-0.5}}>{show(totalBalance)}</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           {[{l:"Income",v:totalIncome,I:ArrowDownLeft,fn:()=>{setTxnFilter("income");setTab("transactions");}},{l:"Expense",v:totalExpense,I:ArrowUpRight,fn:()=>{setTxnFilter("expense");setTab("transactions");}}].map(x=>(
-            <button key={x.l} onClick={x.fn} style={{background:"rgba(255,255,255,0.15)",borderRadius:14,padding:"11px 13px",border:"none",cursor:"pointer",textAlign:"left"}}>
+            <button type="button" key={x.l} onClick={x.fn} style={{background:"rgba(255,255,255,0.15)",borderRadius:14,padding:"11px 13px",border:"none",cursor:"pointer",textAlign:"left"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><div style={{width:20,height:20,borderRadius:6,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}><x.I size={11}/></div><span style={{color:"rgba(255,255,255,0.8)",fontSize:11}}>{x.l}</span></div>
               <p style={{color:"#fff",fontSize:14,fontWeight:800,margin:0}}>{hidden?mask(x.v):fmtShort(x.v)}</p>
             </button>
@@ -786,7 +802,7 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
           <Card style={{height:"100%", marginBottom:0}}>
             <Row style={{marginBottom:12}}>
               <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Monthly Budget</p>
-              <button onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
+              <button type="button" onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
             </Row>
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               <div style={{position:"relative",width:64,height:64,flexShrink:0}}>
@@ -799,7 +815,7 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
               <div style={{flex:1}}>
                 <Row style={{marginBottom:4}}><span style={{fontSize:12,color:"#9ca3af"}}>Terpakai</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(totalExpense)}</span></Row>
                 <Row style={{marginBottom:8}}><span style={{fontSize:12,color:"#9ca3af"}}>Limit</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(monthlyBudget)}</span></Row>
-                <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/dLeft))):fmt(Math.max(0,Math.floor(budgetLeft/dLeft)))} / hari`}</p>
+                <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/Math.max(1,dLeft)))) : fmt(Math.max(0,Math.floor(budgetLeft/Math.max(1,dLeft))))} / hari`}</p>
               </div>
             </div>
           </Card>
@@ -819,13 +835,13 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         </div>
       </div>
 
-      <Row style={{marginBottom:10}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Akun Saya</p><button onClick={()=>setTab("accounts")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
+      <Row style={{marginBottom:10}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Akun Saya</p><button type="button" onClick={()=>setTab("accounts")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
       <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:6,scrollbarWidth:"none"}}>
         {accounts.length===0&&<div style={{background:"#fff",borderRadius:16,padding:"14px 20px",minWidth:160,color:"#9ca3af",fontSize:12}}>Belum ada akun</div>}
         {accounts.map((acc,i)=>{
           const T=ACC_TYPES.find(t=>t.type===acc.type);
           return (
-            <button key={acc.id} onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),borderRadius:16,padding:"14px",minWidth:155,flexShrink:0,border:"none",cursor:"pointer",textAlign:"left",position:"relative",overflow:"hidden"}}>
+            <button type="button" key={acc.id} onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),borderRadius:16,padding:"14px",minWidth:155,flexShrink:0,border:"none",cursor:"pointer",textAlign:"left",position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:-15,right:-15,width:50,height:50,borderRadius:"50%",background:"rgba(255,255,255,0.1)"}}/>
               <Row style={{marginBottom:10}}><p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.9)",fontWeight:600,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{acc.name}</p><div style={{color:"rgba(255,255,255,0.7)",flexShrink:0}}>{T&&<T.Icon s={15}/>}</div></Row>
               <p style={{color:"#fff",fontSize:16,fontWeight:800,margin:"0 0 5px"}}>{hidden?mask(acc.balance):fmtShort(acc.balance)}</p>
@@ -835,13 +851,13 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         })}
       </div>
 
-      <Row style={{margin:"14px 0 10px"}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Transaksi Terbaru</p><button onClick={()=>setTab("transactions")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
+      <Row style={{margin:"14px 0 10px"}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Transaksi Terbaru</p><button type="button" onClick={()=>setTab("transactions")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
       <Card style={{padding:"4px 0"}}>
         {recent.length===0&&<p style={{color:"#9ca3af",textAlign:"center",padding:"20px",fontSize:13}}>Belum ada transaksi</p>}
         {recent.map((t,i)=>{
           const acc=accounts.find(a=>a.id===t.accountId);
           return (
-            <button key={t.id} onClick={()=>onTxnClick(t)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<recent.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
+            <button type="button" key={t.id} onClick={()=>onTxnClick(t)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<recent.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
               <CatBub cat={t.category}/>
               <div style={{flex:1,minWidth:0}}><p style={{margin:0,fontSize:13,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note||"Transaksi"}</p><p style={{margin:"2px 0 0",fontSize:11,color:"#9ca3af"}}>{t.date}{t.time?` · ${t.time}`:""}</p></div>
               <div style={{textAlign:"right",flexShrink:0}}><p style={{margin:0,fontSize:13,fontWeight:800,color:t.type==="income"?G:"#ef4444"}}>{t.type==="income"?"+":"-"}Rp {hidden?"•••••":t.amount.toLocaleString("id-ID")}</p><p style={{margin:"2px 0 0",fontSize:10,color:"#9ca3af"}}>{acc?.name||""}</p></div>
@@ -868,28 +884,35 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
   useEffect(()=>{ if(searchOpen&&searchRef.current)searchRef.current.focus(); },[searchOpen]);
 
   const filtered=useMemo(()=>{
-    let arr=[...transactions].sort((a,b)=>(b.date+(b.time||""))-(a.date+(a.time||"")));
+    let arr=[...transactions].sort(sortByDateDesc);
     if(typeF!=="all")arr=arr.filter(t=>t.type===typeF);
     if(dateF==="today")arr=arr.filter(t=>t.date===todayStr());
     else if(dateF==="week")arr=arr.filter(t=>t.date>=startOfWeek());
     else if(dateF==="month")arr=arr.filter(t=>t.date>=startOfMonth());
     else if(dateF==="custom"&&from)arr=arr.filter(t=>t.date>=from&&t.date<=to);
-    if(search.trim()){const q=search.toLowerCase();arr=arr.filter(t=>t.note?.toLowerCase().includes(q)||t.category?.toLowerCase().includes(q)||accounts.find(a=>a.id===t.accountId)?.name.toLowerCase().includes(q));}
+    
+    if(search.trim()){
+      const q=search.toLowerCase();
+      arr=arr.filter(t=>{
+         const accName = accounts.find(a=>a.id===t.accountId)?.name || "";
+         return t.note?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q) || accName.toLowerCase().includes(q);
+      });
+    }
     return arr;
-  },[transactions,typeF,dateF,from,to,search]);
+  },[transactions,typeF,dateF,from,to,search,accounts]);
 
   const totalInc=filtered.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const totalExp=filtered.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const net=totalInc-totalExp;
   const grouped=useMemo(()=>{ const m=new Map();filtered.forEach(t=>{if(!m.has(t.date))m.set(t.date,[]);m.get(t.date).push(t);}); return Array.from(m.entries()).sort((a,b)=>new Date(b[0])-new Date(a[0])); },[filtered]);
 
-  const FP=({label,active,onClick,col=G})=><button onClick={onClick} style={{padding:"7px 14px",borderRadius:99,border:`1.5px solid ${active?col:"#e5e7eb"}`,background:active?col:"#fff",color:active?"#fff":"#6b7280",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{label}</button>;
+  const FP=({label,active,onClick,col=G})=><button type="button" onClick={onClick} style={{padding:"7px 14px",borderRadius:99,border:`1.5px solid ${active?col:"#e5e7eb"}`,background:active?col:"#fff",color:active?"#fff":"#6b7280",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{label}</button>;
 
   return (
     <div style={{padding:"0 16px 16px"}}>
       {(searchOpen||search)&&(
         <div style={{display:"flex",alignItems:"center",gap:8,background:"#fff",borderRadius:14,padding:"10px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <Search size={16} color="#9ca3af"/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari transaksi, kategori..." style={{flex:1,border:"none",outline:"none",fontSize:14,color:"#111",background:"transparent"}}/><button onClick={()=>{setSearch("");onSearchClose?.();}} style={{background:"none",border:"none",cursor:"pointer",color:"#9ca3af",display:"flex"}}><X size={16}/></button>
+          <Search size={16} color="#9ca3af"/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari transaksi, kategori..." style={{flex:1,border:"none",outline:"none",fontSize:14,color:"#111",background:"transparent"}}/><button type="button" onClick={()=>{setSearch("");onSearchClose?.();}} style={{background:"none",border:"none",cursor:"pointer",color:"#9ca3af",display:"flex"}}><X size={16}/></button>
         </div>
       )}
       <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,marginBottom:8,scrollbarWidth:"none"}}><FP label="Semua" active={typeF==="all"} onClick={()=>setTypeF("all")}/><FP label="Pengeluaran" active={typeF==="expense"} onClick={()=>setTypeF("expense")} col="#ef4444"/><FP label="Pemasukan" active={typeF==="income"} onClick={()=>setTypeF("income")} col={G}/></div>
@@ -911,7 +934,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
             {txns.map((t,i)=>{
               const acc=accounts.find(a=>a.id===t.accountId);
               return (
-                <button key={t.id} onClick={()=>onTxnClick(t)}
+                <button type="button" key={t.id} onClick={()=>onTxnClick(t)}
                   style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<txns.length-1?"1px solid #f8fafc":"none",background:"none",borderTop:"none",borderLeft:"none",borderRight:"none",width:"100%",cursor:"pointer",textAlign:"left"}}>
                   <CatBub cat={t.category} size={40}/>
                   <div style={{flex:1,minWidth:0}}>
@@ -972,7 +995,7 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
       </div>
       <Row style={{marginBottom:10}}>
         <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Daftar Akun</p>
-        <button onClick={()=>setShowAdd(true)} style={{background:GL,border:"none",borderRadius:10,padding:"7px 14px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Plus size={14}/> Tambah</button>
+        <button type="button" onClick={()=>setShowAdd(true)} style={{background:GL,border:"none",borderRadius:10,padding:"7px 14px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Plus size={14}/> Tambah</button>
       </Row>
       {accounts.length===0&&<Card style={{textAlign:"center",padding:"24px"}}><p style={{color:"#9ca3af",fontSize:13}}>Belum ada akun. Tambah sekarang!</p></Card>}
       
@@ -983,7 +1006,7 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
           return (
             <div key={acc.id} style={{transition:"transform .3s cubic-bezier(0.34,1.56,0.64,1), opacity .2s",transform:isAnim?"scale(1.02)":"scale(1)",opacity:isAnim?0.85:1,marginBottom:10}}>
               <Card style={{padding:0,overflow:"hidden",marginBottom:0}}>
-                <button onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
+                <button type="button" onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
                   <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
                     {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:28,height:28,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
                   </div>
@@ -994,10 +1017,10 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
                   <p style={{margin:0,fontSize:15,fontWeight:800,color:"#fff"}}>{fmtShort(acc.balance)}</p>
                 </button>
                 <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
-                  <button onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
-                  <button onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
-                  <button onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
-                  <button onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
+                  <button type="button" onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
+                  <button type="button" onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
+                  <button type="button" onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
+                  <button type="button" onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>t.accountId===acc.id).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
                 </div>
               </Card>
             </div>
@@ -1015,7 +1038,7 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
 function ChartsScreen({ transactions }) {
   const totalInc=transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const totalExp=transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
-  const pieData=useMemo(()=>{const m={};transactions.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value,color:CAT_COLORS[name]||"#9ca3af",pct:Math.round(value/totalExp*100)}));},[transactions,totalExp]);
+  const pieData=useMemo(()=>{const m={};transactions.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value,color:CAT_COLORS[name]||"#9ca3af",pct:totalExp>0?Math.round(value/totalExp*100):0}));},[transactions,totalExp]);
   const barData=useMemo(()=>{const w={"Mg 1":{income:0,expense:0},"Mg 2":{income:0,expense:0},"Mg 3":{income:0,expense:0},"Mg 4":{income:0,expense:0}};transactions.forEach(t=>{const d=new Date(t.date).getDate();const k=d<=7?"Mg 1":d<=14?"Mg 2":d<=21?"Mg 3":"Mg 4";w[k][t.type]+=t.amount;});return Object.entries(w).map(([name,v])=>({name,...v}));},[transactions]);
   return (
     <div style={{padding:"0 16px 16px"}}>
@@ -1092,10 +1115,10 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       <Card style={{textAlign:"center",padding:"24px 16px"}}>
         <div style={{position:"relative",width:72,height:72,margin:"0 auto 12px"}}>
           {userAvatar?<img src={userAvatar} alt="" style={{width:72,height:72,borderRadius:22,objectFit:"cover"}}/>:<div style={{width:72,height:72,borderRadius:22,background:`linear-gradient(135deg,${G},${G2})`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"}}><UserCircle size={36} strokeWidth={1.2}/></div>}
-          <button onClick={()=>avatarRef.current.click()} style={{position:"absolute",bottom:-4,right:-4,width:26,height:26,borderRadius:8,background:G,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Camera size={12}/></button>
+          <button type="button" onClick={()=>avatarRef.current.click()} style={{position:"absolute",bottom:-4,right:-4,width:26,height:26,borderRadius:8,background:G,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Camera size={12}/></button>
           <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleAvatar}/>
         </div>
-        {editName?<div style={{display:"flex",gap:8,justifyContent:"center",alignItems:"center"}}><input value={nameInput} onChange={e=>setNameInput(e.target.value)} style={{border:`1.5px solid ${G}`,borderRadius:10,padding:"6px 12px",fontSize:14,fontWeight:700,outline:"none",textAlign:"center"}}/><button onClick={()=>{setUserName(nameInput);setEditName(false);}} style={{background:G,border:"none",borderRadius:9,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Check size={14}/></button></div>:<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8}}><p style={{margin:0,fontSize:16,fontWeight:800,color:"#111"}}>{userName}</p><button onClick={()=>setEditName(true)} style={{background:"none",border:"none",color:"#9ca3af",cursor:"pointer"}}><Pencil size={14}/></button></div>}
+        {editName?<div style={{display:"flex",gap:8,justifyContent:"center",alignItems:"center"}}><input value={nameInput} onChange={e=>setNameInput(e.target.value)} style={{border:`1.5px solid ${G}`,borderRadius:10,padding:"6px 12px",fontSize:14,fontWeight:700,outline:"none",textAlign:"center"}}/><button type="button" onClick={()=>{if(!nameInput.trim())return; setUserName(nameInput.trim());setEditName(false);}} style={{background:G,border:"none",borderRadius:9,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Check size={14}/></button></div>:<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8}}><p style={{margin:0,fontSize:16,fontWeight:800,color:"#111"}}>{userName}</p><button type="button" onClick={()=>setEditName(true)} style={{background:"none",border:"none",color:"#9ca3af",cursor:"pointer"}}><Pencil size={14}/></button></div>}
         <p style={{margin:"4px 0 0",fontSize:12,color:"#9ca3af"}}>{transactions.length} transaksi · {accounts.length} akun</p>
       </Card>
       
@@ -1104,7 +1127,7 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
         <SRow icon={<Lock size={15} strokeWidth={1.7}/>} title="Kunci PIN" sub={pinEnabled?"Aktif — app terkunci saat keluar background":"Nonaktif"} 
           right={<Tog on={pinEnabled} onToggle={()=>{ if(pinEnabled){setPinEnabled(false);setBioEnabled(false);}else{setShowSetPin(true);} }}/>}/>
         {pinEnabled&&<SRow icon={<Fingerprint size={15} strokeWidth={1.7}/>} title="Biometrik" sub="Gunakan sidik jari / wajah" right={<Tog on={bioEnabled} onToggle={()=>setBioEnabled(p=>!p)}/> }/>}
-        {pinEnabled&&<SRow icon={<Shield size={15} strokeWidth={1.7}/>} title="Ganti PIN" right={<button onClick={()=>setShowSetPin(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Ubah</button>}/>}
+        {pinEnabled&&<SRow icon={<Shield size={15} strokeWidth={1.7}/>} title="Ganti PIN" right={<button type="button" onClick={()=>setShowSetPin(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Ubah</button>}/>}
       </Card>
       
       <Card style={{padding:"4px 0",marginBottom:12}}>
@@ -1114,14 +1137,14 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>DATA</p>
-        <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
-        <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
-        <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button onClick={()=>setShowConfirm(true)} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
+        <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button type="button" onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
+        <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button type="button" onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
+        <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button type="button" onClick={()=>setShowConfirm(true)} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
       </Card>
       
       <Card style={{padding:"4px 0"}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.2 (Ultimate Edition)"/>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.3 (Fully Audited)"/>
       </Card>
       
       {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
@@ -1175,7 +1198,7 @@ function FanNav({ tab, setTab, onAddTxn }) {
               opacity: open ? 1 : 0, transform: open ? "translateY(0)" : "translateY(6px)",
               transition: open ? `opacity 0.2s ease ${item.delay + 80}ms, transform 0.2s ease ${item.delay + 80}ms` : "none",
             }}>{item.label}</div>
-            <button onClick={()=>handleArchItem(item)} style={{
+            <button type="button" onClick={()=>handleArchItem(item)} style={{
               width: item.isAdd ? 50 : 54, height: item.isAdd ? 50 : 54, borderRadius:"50%",
               background: item.isAdd ? `linear-gradient(145deg,${G},${G2})` : "#fff",
               border: item.isAdd ? "2.5px solid rgba(255,255,255,0.4)" : "2px solid #e5e7eb",
@@ -1192,7 +1215,7 @@ function FanNav({ tab, setTab, onAddTxn }) {
         );
       })}
 
-      {/* Main Nav Container (Grid for strict symmetry) */}
+      {/* Main Nav Container */}
       <div style={{
         position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)", width:"100%",maxWidth:430,
         background:"#fff",borderTop:"1px solid #f1f5f9",
@@ -1202,7 +1225,7 @@ function FanNav({ tab, setTab, onAddTxn }) {
       }}>
         {/* BERANDA */}
         <div style={{display:"flex",justifyContent:"center"}}>
-          <button onClick={()=>{setTab("home");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
+          <button type="button" onClick={()=>{setTab("home");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
             <div style={{color:tab==="home"?G:"#9ca3af"}}><Home size={22} strokeWidth={2}/></div>
             <span style={{fontSize:10,fontWeight:tab==="home"?800:600,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
           </button>
@@ -1211,7 +1234,7 @@ function FanNav({ tab, setTab, onAddTxn }) {
         <div /> 
         {/* PROFIL */}
         <div style={{display:"flex",justifyContent:"center"}}>
-          <button onClick={()=>{setTab("profile");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
+          <button type="button" onClick={()=>{setTab("profile");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
             <div style={{color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={22} strokeWidth={2}/></div>
             <span style={{fontSize:10,fontWeight:tab==="profile"?800:600,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
           </button>
@@ -1219,7 +1242,7 @@ function FanNav({ tab, setTab, onAddTxn }) {
       </div>
 
       {/* Main FAB DompetKu */}
-      <button onClick={()=>setOpen(p=>!p)} style={{
+      <button type="button" onClick={()=>setOpen(p=>!p)} style={{
         position:"fixed", bottom:NAV_BOT, left:"50%", transform:`translateX(-50%)`,
         width:64,height:64,borderRadius:"50%",
         background: open ? "linear-gradient(145deg,#374151,#1f2937)" : `linear-gradient(145deg,${G},${G2})`,
@@ -1287,20 +1310,24 @@ export default function App() {
     return()=>document.removeEventListener("visibilitychange",handle);
   },[pinEnabled]);
 
-  useEffect(()=>{
-    window.history.pushState({dk:1},"");
-    const handle=()=>{
-      if(locked){ window.history.pushState({dk:1},""); return; }
-      if(viewTxn){ setViewTxn(null); window.history.pushState({dk:1},""); return; }
-      if(selectedAcc){ setSelectedAcc(null); window.history.pushState({dk:1},""); return; }
-      if(showAdd){ setShowAdd(false); window.history.pushState({dk:1},""); return; }
-      if(editTxn){ setEditTxn(null); window.history.pushState({dk:1},""); return; }
-      if(tab!=="home"){ setTab("home"); window.history.pushState({dk:1},""); return; }
-      setShowExitConfirm(true); window.history.pushState({dk:1},"");
+  // Improved History / Back Button Trapping
+  useEffect(() => {
+    window.history.pushState({dk: "home"}, "");
+    const handlePopState = (e) => {
+      window.history.pushState({dk: "home"}, ""); // Keep them trapped inside SPA
+      if (locked) return;
+      if (showExitConfirm) { setShowExitConfirm(false); return; }
+      if (viewTxn) { setViewTxn(null); return; }
+      if (editTxn) { setEditTxn(null); return; }
+      if (showAdd) { setShowAdd(false); return; }
+      if (showImport) { setShowImport(false); return; }
+      if (selectedAcc) { setSelectedAcc(null); return; }
+      if (tab !== "home") { setTab("home"); return; }
+      setShowExitConfirm(true);
     };
-    window.addEventListener("popstate",handle);
-    return()=>window.removeEventListener("popstate",handle);
-  },[tab,selectedAcc,locked,showAdd,editTxn,viewTxn]);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [locked, viewTxn, editTxn, showAdd, showImport, selectedAcc, tab, showExitConfirm]);
 
   const deleteTransaction = useCallback(txn=>{
     setTransactions(p=>p.filter(t=>t.id!==txn.id));
@@ -1326,7 +1353,15 @@ export default function App() {
     setEditTxn(null); setViewTxn(null);
   },[]);
 
-  const importTxns = txns=>setTransactions(p=>[...txns,...p]);
+  const importTxns = useCallback(txns=>{
+    setTransactions(p => [...txns, ...p]);
+    // Reconcile imported txns directly to accounts
+    setAccounts(p => p.map(a => {
+       const accDiff = txns.filter(t => t.accountId === a.id).reduce((sum, t) => sum + (t.type==="income"?t.amount:-t.amount), 0);
+       return accDiff !== 0 ? { ...a, balance: a.balance + accDiff } : a;
+    }));
+    setShowImport(false);
+  }, []);
 
   const titleMap={home:"Beranda",transactions:"Riwayat",accounts:"Akun",charts:"Analisis",profile:"Profil"};
 
@@ -1355,9 +1390,9 @@ export default function App() {
       <div style={{background:"#fff",paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)",paddingBottom:12,paddingLeft:20,paddingRight:20,display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #f1f5f9",position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 0 #f1f5f9"}}>
         <h1 style={{margin:0,fontSize:17,fontWeight:800,color:"#111"}}>{titleMap[tab]}</h1>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <span style={{fontSize:11,fontWeight:600,color:"#9ca3af",background:"#f8fafc",borderRadius:8,padding:"4px 8px"}}>{fmtDate()}</span>
-          {tab==="transactions"&&<button onClick={()=>setSearchOpen(p=>!p)} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><Search size={15} strokeWidth={1.7}/></button>}
-          {pinEnabled&&<button onClick={()=>setLocked(true)} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><Lock size={15} strokeWidth={1.7}/></button>}
+          {/* Tanggal Atas Saja yang disisakan */}
+          {tab==="transactions"&&<button type="button" onClick={()=>setSearchOpen(p=>!p)} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><Search size={15} strokeWidth={1.7}/></button>}
+          {pinEnabled&&<button type="button" onClick={()=>setLocked(true)} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#374151"}}><Lock size={15} strokeWidth={1.7}/></button>}
         </div>
       </div>
 
@@ -1378,7 +1413,15 @@ export default function App() {
       {editTxn&&<TxnModal initial={{...editTxn,amountStr:editTxn.amount.toLocaleString("id-ID")}} accounts={accounts} onClose={()=>setEditTxn(null)} onSave={updated=>updateTransaction(editTxn,updated)} soundEnabled={soundEnabled} isPickingFile={isPickingFile}/>}
       {showImport&&<ImportModal accounts={accounts} onClose={()=>setShowImport(false)} onImport={importTxns} isPickingFile={isPickingFile}/>}
       {viewTxn&&<TxnDetailSheet txn={viewTxn} accounts={accounts} onClose={()=>setViewTxn(null)} onEdit={t=>{ setViewTxn(null); setEditTxn(t); }} onDelete={t=>{ deleteTransaction(t); setViewTxn(null); }}/>}
-      {showExitConfirm&&<ConfirmDialog title="Keluar dari DompetKu?" sub="Yakin ingin menutup aplikasi?" danger={false} confirmLabel="Keluar" onConfirm={()=>{ setShowExitConfirm(false); if(window.Capacitor?.Plugins?.App) window.Capacitor.Plugins.App.exitApp(); else if(window.close) window.close(); }} onCancel={()=>setShowExitConfirm(false)}/>}
+      
+      {/* Safe Exit Flow */}
+      {showExitConfirm&&<ConfirmDialog title="Keluar dari DompetKu?" sub="Yakin ingin menutup aplikasi?" danger={false} confirmLabel="Keluar" 
+        onConfirm={()=>{ 
+          setShowExitConfirm(false); 
+          if(window.Capacitor?.Plugins?.App) window.Capacitor.Plugins.App.exitApp(); 
+          else if(window.close) { window.close(); alert("Silakan tutup tab/aplikasi ini."); }
+        }} 
+        onCancel={()=>setShowExitConfirm(false)}/>}
     </div>
   );
 }
