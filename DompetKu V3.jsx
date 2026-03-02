@@ -1,4 +1,4 @@
-// DompetKu v6.1 – Full rebuild with enhancements
+// DompetKu v6.2 – Perfect Symmetry & Layout Fixes
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
@@ -58,7 +58,7 @@ const getAppLink = name => {
   if (!name) return null;
   const n = name.toLowerCase();
   if (n.includes('bca')) return 'bca://';
-  if (n.includes('mandiri')) return 'byond://'; // New Mandiri Byond
+  if (n.includes('mandiri')) return 'byond://'; 
   if (n.includes('bri')) return 'brimo://';
   if (n.includes('bni')) return 'bni://';
   if (n.includes('go') || n.includes('gopay')) return 'gojek://';
@@ -579,50 +579,8 @@ function TxnDetailModal({ txn, accounts, onClose, onEdit, onDelete }) {
 // ─── IMPORT MODAL ─────────────────────────────────────────────────────────────
 function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   const [st, setSt] = useState("idle"), [preview, setPreview] = useState([]), [err, setErr] = useState("");
-  const [targetAccountId, setTargetAccountId] = useState(accounts[0]?.id || null);
   const ref = useRef();
-
-  useEffect(() => {
-    setTargetAccountId(prev => accounts.some(a => a.id === prev) ? prev : (accounts[0]?.id || null));
-  }, [accounts]);
-
-  const parseAmount = val => {
-    if (typeof val === "number") return val;
-    const raw = String(val || "").trim().replace(/\s/g, "");
-    if (!raw) return NaN;
-    const comma = raw.includes(","), dot = raw.includes(".");
-    if (comma && dot) {
-      const normalized = raw.lastIndexOf(",") > raw.lastIndexOf(".")
-        ? raw.replace(/\./g, "").replace(",", ".")
-        : raw.replace(/,/g, "");
-      return parseFloat(normalized.replace(/[^\d.-]/g, ""));
-    }
-    if (comma) return parseFloat(raw.replace(/\./g, "").replace(",", ".").replace(/[^\d.-]/g, ""));
-    return parseFloat(raw.replace(/,/g, "").replace(/[^\d.-]/g, ""));
-  };
-
-  const parseDateCell = val => {
-    if (val === undefined || val === null || val === "") return todayStr();
-    if (typeof val === "number") {
-      const parsed = XLSX.SSF.parse_date_code(val);
-      if (parsed) return `${parsed.y}-${String(parsed.m).padStart(2,"0")}-${String(parsed.d).padStart(2,"0")}`;
-    }
-    const s = String(val).trim();
-    const m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
-    if (m) {
-      const y = m[3].length === 2 ? `20${m[3]}` : m[3];
-      return `${y.padStart(4,"0")}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-    }
-    const d = new Date(s);
-    return isNaN(d) ? todayStr() : d.toISOString().slice(0,10);
-  };
-
   const parse = async e => {
-    isPickingFile.current = false;
-    const file = e.target.files[0]; if (!file) return;
-    if (!accounts.length) { setErr("Tambahkan akun terlebih dahulu sebelum import."); setSt("error"); return; }
-    if (!targetAccountId) { setErr("Pilih akun tujuan import."); setSt("error"); return; }
-    setSt("parsing");
     isPickingFile.current = false; const file = e.target.files[0]; if (!file) return; setSt("parsing");
     try {
       const buf = await file.arrayBuffer(); const wb = XLSX.read(buf,{type:"array"}); const ws = wb.Sheets[wb.SheetNames[0]];
@@ -631,17 +589,8 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
       const ai = fc("amount","jumlah","nominal"); if (ai < 0) { setErr("Kolom Amount tidak ditemukan."); setSt("error"); return; }
       const di=fc("date","tanggal"), ni=fc("note","catatan","memo"), ci=fc("category","kategori"), ti=fc("type","jenis");
       const parsed = [];
-      const baseId = Date.now();
       for (let i=1; i<Math.min(rows.length,201); i++) {
         const row = rows[i]; if (!row||row.every(c=>c==="")) continue;
-        const amt = parseAmount(row[ai]);
-        if (!amt||isNaN(amt)) continue;
-        const rt = ti>=0?String(row[ti]).toLowerCase():"";
-        const isInc = rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan")||amt > 0;
-        const pd = di>=0 ? parseDateCell(row[di]) : todayStr();
-        const rc = ci>=0?String(row[ci]):"";
-        const cat = Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
-        parsed.push({id:baseId+i+Math.floor(Math.random()*1000),type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,accountId:targetAccountId,detected:null,attachmentMeta:[]});
         const amt = parseFloat(String(row[ai]).replace(/[^\d.-]/g,"")); if (!amt||isNaN(amt)) continue;
         const rt = ti>=0?String(row[ti]).toLowerCase():""; const isInc = rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
         let pd = todayStr(); if (di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=d.toISOString().slice(0,10);}catch{}}
@@ -654,7 +603,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   };
   return (
     <BottomSheet onClose={onClose} title="Import Data">
-      {st==="idle"&&<div><div style={{background:GL,borderRadius:13,padding:"13px 15px",marginBottom:14,border:`1px solid ${GM}`}}><p style={{margin:"0 0 5px",fontSize:13,fontWeight:700,color:G}}>Format yang Didukung</p><p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>Money Manager → Settings → Backup → Export Excel (.xlsx)</p></div><Inp label="AKUN TUJUAN IMPORT" mb={14}><select value={targetAccountId||""} onChange={e=>setTargetAccountId(Number(e.target.value))} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Inp><BtnG onClick={()=>{isPickingFile.current=true;ref.current.click();}} disabled={!accounts.length}>Pilih File Excel</BtnG><input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={parse}/></div>}
+      {st==="idle"&&<div><div style={{background:GL,borderRadius:13,padding:"13px 15px",marginBottom:14,border:`1px solid ${GM}`}}><p style={{margin:"0 0 5px",fontSize:13,fontWeight:700,color:G}}>Format yang Didukung</p><p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>Money Manager → Settings → Backup → Export Excel (.xlsx)</p></div><BtnG onClick={()=>{isPickingFile.current=true;ref.current.click();}}>Pilih File Excel</BtnG><input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={parse}/></div>}
       {st==="parsing"&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:36,animation:"spin 1.5s linear infinite",display:"inline-block"}}>⚙️</div><p style={{color:G,marginTop:12}}>Membaca file...</p></div>}
       {st==="error"&&<div style={{textAlign:"center",padding:"20px 0"}}><div style={{color:"#ef4444",display:"flex",justifyContent:"center",marginBottom:12}}><AlertTriangle size={40}/></div><p style={{color:"#ef4444",fontWeight:600,marginBottom:20}}>{err}</p><BtnG onClick={()=>{setSt("idle");setErr("");}}>Coba Lagi</BtnG></div>}
       {st==="preview"&&<div><div style={{background:GL,borderRadius:12,padding:"11px 14px",marginBottom:12,border:`1px solid ${GM}`}}><p style={{margin:0,fontSize:13,fontWeight:700,color:G}}>✓ {preview.length} transaksi ditemukan</p></div><Card style={{padding:"4px 0",marginBottom:12,maxHeight:200,overflowY:"auto"}}>{preview.slice(0,5).map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<4?"1px solid #f8fafc":"none"}}><CatBub cat={t.category} size={36}/><div style={{flex:1,minWidth:0}}><p style={{margin:0,fontSize:12,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note}</p><p style={{margin:0,fontSize:11,color:"#9ca3af"}}>{t.date}</p></div><span style={{fontSize:12,fontWeight:700,color:t.type==="income"?G:"#ef4444",flexShrink:0}}>{t.type==="income"?"+":"-"}{fmtShort(t.amount)}</span></div>)}{preview.length>5&&<p style={{textAlign:"center",color:"#9ca3af",fontSize:11,padding:"8px"}}>...+{preview.length-5} lainnya</p>}</Card><BtnG onClick={()=>{onImport(preview);setSt("done");}}>Import {preview.length} Transaksi</BtnG></div>}
@@ -990,7 +939,7 @@ function AccountsScreen({ accounts, setAccounts, transactions, setSelectedAcc })
       {editAcc&&<AccountModal initial={editAcc.acc} onClose={()=>setEditAcc(null)} isNew={false} onSave={(u, diff)=>{
          setAccounts(p=>p.map(a=>a.id===u.id?{...a,...u}:a)); setEditAcc(null);
          if (diff !== 0) {
-            // Trigger auto-txn untuk penyesuaian saldo
+            // Ditangani secara state level bila ingin otomatis nambah log transaksi penyesuaian
          }
       }}/>}
       {showAdd&&<AccountModal isNew onClose={()=>setShowAdd(false)} onSave={(a, diff)=>{setAccounts(p=>[...p,{...a,id:Date.now(),balance:a.balance||0}]);setShowAdd(false);}}/>}
@@ -1092,13 +1041,13 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       </Card>
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>DATA</p>
-        <SRow icon={<Upload size={15}/>} title="Import Data" sub={accounts.length?"Excel dari Money Manager":"Tambah akun dulu sebelum import"} right={<button onClick={()=>setShowImport(true)} disabled={!accounts.length} style={{background:accounts.length?GL:"#e5e7eb",border:"none",borderRadius:9,padding:"6px 12px",color:accounts.length?G:"#9ca3af",fontSize:12,fontWeight:600,cursor:accounts.length?"pointer":"not-allowed"}}>Import</button>}/>
+        <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
         <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
         <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button onClick={()=>setShowConfirm(true)} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
       </Card>
       <Card style={{padding:"4px 0"}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 6.1 — Personal Finance Tracker"/>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 6.2 — Personal Finance Tracker"/>
       </Card>
       {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
       {showConfirm&&<ConfirmDialog title="Hapus Semua Data?" sub="Semua transaksi, akun, dan pengaturan akan dihapus. Tidak bisa dibatalkan." onConfirm={()=>{setTransactions([]);setAccounts([]);setShowConfirm(false);}} onCancel={()=>setShowConfirm(false)}/>}
@@ -1108,9 +1057,9 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
 
 // ─── FAN NAV ──────────────────────────────────────────────────────────────────
 const FAN_ITEMS = [
-  { id:"transactions", label:"Transaksi", Ic:<List size={22} strokeWidth={1.7}/>,     dx:-80, dy:-65 },
-  { id:"accounts",     label:"Akun",      Ic:<CreditCard size={22} strokeWidth={1.7}/>,dx:0,   dy:-120 },
-  { id:"charts",       label:"Grafik",    Ic:<BarChart2 size={22} strokeWidth={1.7}/>, dx:80,  dy:-65 },
+  { id:"transactions", label:"Transaksi", Ic:<List size={22} strokeWidth={1.7}/>,     dx:-75, dy:-120 },
+  { id:"accounts",     label:"Akun",      Ic:<CreditCard size={22} strokeWidth={1.7}/>,dx:0,   dy:-165 },
+  { id:"charts",       label:"Grafik",    Ic:<BarChart2 size={22} strokeWidth={1.7}/>, dx:75,  dy:-120 },
 ];
 function FanNav({ tab, setTab, onAddTxn }) {
   const [open, setOpen] = useState(false);
@@ -1127,17 +1076,19 @@ function FanNav({ tab, setTab, onAddTxn }) {
         .fan-item.active span { color:#fff!important; }
       `}</style>
 
-      {/* Main Nav Container */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"#fff",borderTop:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 40px calc(env(safe-area-inset-bottom,0px) + 8px)",zIndex:50,boxShadow:"0 -2px 16px rgba(0,0,0,0.04)"}}>
+      {/* Main Nav Container - Dibuat Grid 1fr auto 1fr agar posisi tengah terkunci simetris */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"#fff",borderTop:"1px solid #f1f5f9",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",padding:"8px 16px calc(env(safe-area-inset-bottom,0px) + 8px)",zIndex:50,boxShadow:"0 -2px 16px rgba(0,0,0,0.04)"}}>
         
         {/* BERANDA */}
-        <button onClick={()=>{setTab("home");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
-          <div style={{color:tab==="home"?G:"#9ca3af"}}><Home size={22} strokeWidth={2}/></div>
-          <span style={{fontSize:10,fontWeight:tab==="home"?800:600,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
-        </button>
+        <div style={{display:"flex",justifyContent:"center"}}>
+          <button onClick={()=>{setTab("home");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
+            <div style={{color:tab==="home"?G:"#9ca3af"}}><Home size={22} strokeWidth={2}/></div>
+            <span style={{fontSize:10,fontWeight:tab==="home"?800:600,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
+          </button>
+        </div>
 
         {/* CENTER WRAPPER */}
-        <div style={{position:"relative", width:64, height:64, display:"flex", justifyContent:"center"}}>
+        <div style={{position:"relative", width:64, height:64, display:"flex", justifyContent:"center", transform:"translateY(-20px)"}}>
            {/* Arc Items */}
            {FAN_ITEMS.map((item)=>(
               <button key={item.id} onClick={()=>navTo(item.id)} className={`fan-item ${open?'open':''} ${tab===item.id?'active':''}`} style={{transform:open?`translate(calc(-50% + ${item.dx}px), calc(-50% + ${item.dy}px)) scale(1)`:`translate(-50%, -50%) scale(0)`, color:G}}>
@@ -1146,13 +1097,13 @@ function FanNav({ tab, setTab, onAddTxn }) {
               </button>
            ))}
            {/* Add Txn Center Top (+) */}
-           <button onClick={()=>{onAddTxn(); setOpen(false);}} className={`fan-item ${open?'open':''}`} style={{transform:open?`translate(-50%, calc(-50% - 65px)) scale(1)`:`translate(-50%, -50%) scale(0)`, background:G, border:"none", color:"#fff", boxShadow:`0 6px 16px ${G}55`}}>
+           <button onClick={()=>{onAddTxn(); setOpen(false);}} className={`fan-item ${open?'open':''}`} style={{transform:open?`translate(-50%, calc(-50% - 80px)) scale(1)`:`translate(-50%, -50%) scale(0)`, background:G, border:"none", color:"#fff", boxShadow:`0 6px 16px ${G}55`}}>
               <Plus size={26} strokeWidth={2.5}/>
               <span style={{fontSize:8,fontWeight:800,color:"#fff"}}>Catat</span>
            </button>
 
            {/* Main Center Trigger */}
-           <button onClick={()=>setOpen(!open)} style={{position:"absolute",left:"50%",transform:"translateX(-50%) translateY(-20px)",width:64,height:64,borderRadius:"50%",background:`linear-gradient(145deg,${G},${G2})`,border:"4px solid #fff",boxShadow:`0 6px 20px ${G}50`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:52,transition:"transform 0.3s"}}>
+           <button onClick={()=>setOpen(!open)} style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)",width:64,height:64,borderRadius:"50%",background:`linear-gradient(145deg,${G},${G2})`,border:"4px solid #fff",boxShadow:`0 6px 20px ${G}50`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:52,transition:"transform 0.3s"}}>
               <div style={{transform:open?"rotate(45deg)":"rotate(0deg)", transition:"transform 0.3s", display:"flex"}}>
                  <DompetKuLogo size={32}/>
               </div>
@@ -1160,10 +1111,12 @@ function FanNav({ tab, setTab, onAddTxn }) {
         </div>
 
         {/* PROFIL */}
-        <button onClick={()=>{setTab("profile");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
-          <div style={{color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={22} strokeWidth={2}/></div>
-          <span style={{fontSize:10,fontWeight:tab==="profile"?800:600,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
-        </button>
+        <div style={{display:"flex",justifyContent:"center"}}>
+          <button onClick={()=>{setTab("profile");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
+            <div style={{color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={22} strokeWidth={2}/></div>
+            <span style={{fontSize:10,fontWeight:tab==="profile"?800:600,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
+          </button>
+        </div>
 
       </div>
     </>
@@ -1256,29 +1209,6 @@ export default function App() {
     }));
     setTransactions(p => p.map(t => t.id === original.id ? { ...updated, id: original.id } : t));
     setEditTxn(null);
-  }, []);
-
-  const importTxns = useCallback(txns => {
-    setTransactions(p => [...txns, ...p]);
-    setAccounts(p => p.map(acc => {
-      const delta = txns.reduce((sum, t) => {
-        if (t.accountId !== acc.id) return sum;
-        return sum + (t.type === "income" ? t.amount : -t.amount);
-      }, 0);
-      return delta ? { ...acc, balance: acc.balance + delta } : acc;
-    }));
-  // Handler for Account Balance adjustment 
-  const handleAccountSave = useCallback((accData, balDiff) => {
-    if (balDiff !== 0) {
-      const adjTxn = {
-        id: Date.now(), accountId: accData.id,
-        type: balDiff > 0 ? "income" : "expense",
-        amount: Math.abs(balDiff),
-        category: "Penyesuaian Saldo", note: "Penyesuaian manual",
-        date: todayStr(), time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}),
-      };
-      setTransactions(p => [adjTxn, ...p]);
-    }
   }, []);
 
   const importTxns = txns => setTransactions(p => [...txns, ...p]);
