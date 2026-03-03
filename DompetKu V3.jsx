@@ -1,4 +1,4 @@
-// DompetKu Ultimate Version 7.5 (WebAuthn & Sync Patched)
+// DompetKu Version 7.5 — Fixed Edition
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
@@ -15,6 +15,63 @@ import {
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const G = "#2DAB7F", G2 = "#1d8a63", GL = "#E8F7F1", GM = "#b6e4d0", BG = "#F0F3F7";
+
+
+// ─── LANGUAGE SYSTEM ──────────────────────────────────────────
+const LANG_CTX = { lang:"id" };
+const setGlobalLang = (l) => { LANG_CTX.lang = l; };
+const T = (id, en, id_) => LANG_CTX.lang === "en" ? en : (id_ || id);
+
+const TRANSLATIONS = {
+  // Nav
+  "Beranda": "Home", "Profil": "Profile", "Riwayat": "History",
+  "Akun": "Accounts", "Analisis": "Analytics",
+  // Home
+  "Total Balance": "Total Balance", "Income": "Income", "Expense": "Expense",
+  "Akun Saya": "My Accounts", "Lihat semua": "See all",
+  "Transaksi Terakhir": "Recent Transactions",
+  "Monthly Budget": "Monthly Budget", "Edit": "Edit",
+  "Prediksi Keuangan": "Financial Forecast",
+  "SISA ASET (EST. BLN INI)": "PROJECTED END BALANCE",
+  "ASET HABIS PERKIRAAN": "ASSETS DEPLETED",
+  "Surplus / Aman": "Surplus / Safe",
+  // Budget
+  "Atur Budget Bulanan": "Set Monthly Budget",
+  "Terpakai": "Used", "Limit": "Limit", "Budget habis!": "Budget exceeded!",
+  "Terapkan Budget": "Apply Budget", "hari": "days",
+  // Transactions
+  "Catat Transaksi": "Add Transaction", "Edit Transaksi": "Edit Transaction",
+  "Pengeluaran": "Expense", "Pemasukan": "Income", "Transfer": "Transfer",
+  "Simpan Transaksi": "Save Transaction", "Simpan Perubahan": "Save Changes",
+  "JUMLAH (RP)": "AMOUNT (RP)", "CATATAN / NAMA TOKO": "NOTE / MERCHANT",
+  "KATEGORI": "CATEGORY", "AKUN": "ACCOUNT", "TANGGAL": "DATE", "JAM": "TIME",
+  // Accounts
+  "Daftar Akun": "Account List", "Tambah": "Add",
+  "Total Semua Akun": "Total All Accounts",
+  // Charts
+  "Pengeluaran per Kategori": "Expense by Category",
+  "Ringkasan Mingguan": "Weekly Summary",
+  "Analisis Gaya Hidup": "Lifestyle Analysis",
+  "Estimasi Gaji Ideal": "Ideal Salary Estimate",
+  // Profile
+  "Keamanan": "Security", "Preferensi": "Preferences", "Data": "Data",
+  "Kunci PIN": "PIN Lock", "Biometrik": "Biometrics",
+  "Efek Suara": "Sound Effects", "Import Data": "Import Data",
+  "Export CSV": "Export CSV", "Hapus Semua Data": "Delete All Data",
+  "Bahasa / Language": "Language / Bahasa",
+  "Tentang": "About",
+};
+
+function useLang() {
+  const [lang, setLangState] = useState(()=>lsGet("dk_lang","id"));
+  const setLang = (l) => { setLangState(l); lsSet("dk_lang",l); LANG_CTX.lang = l; };
+  useEffect(()=>{ LANG_CTX.lang = lang; },[lang]);
+  const t = (key) => {
+    if(lang === "id") return key;
+    return TRANSLATIONS[key] || key;
+  };
+  return { lang, setLang, t };
+}
 
 // ─── BRAND MAP ────────────────────────────────────────────────────────────────
 const BRAND_MAP = {
@@ -91,21 +148,37 @@ const getDeepLink = name => {
 
 // ─── CATEGORY CONFIG ──────────────────────────────────────────────────────────
 const SMART_RULES = [
-  { kw:["indomaret","alfamart","lawson","minimarket","superindo","giant","hypermart","carrefour","transmart"], cat:"Belanja Harian" },
-  { kw:["gofood","grabfood","shopeefood","kfc","mcdonalds","burger","pizza","starbucks","kopi","bakso","warteg","makan","resto","cafe","coffee","padang","nasi"], cat:"Makan & Minum" },
-  { kw:["tokopedia","shopee","lazada","bukalapak","blibli","tiktok shop","zalora","uniqlo","zara"], cat:"Belanja Online" },
-  { kw:["grab","gojek","ojek","maxim","busway","transjakarta","kereta","mrt","lrt","commuter","bensin","pertamina","shell","parkir","tol"], cat:"Transportasi" },
-  { kw:["netflix","spotify","youtube","disney","vidio","game","bioskop","cinema","cgv","xxi","imax","platinum"], cat:"Hiburan" },
-  { kw:["pln","listrik","pdam","internet","wifi","indihome","telkom","xl","telkomsel","pulsa","token"], cat:"Tagihan" },
-  { kw:["apotek","klinik","dokter","rumah sakit","bpjs","obat","vitamin","halodoc"], cat:"Kesehatan" },
-  { kw:["sekolah","kuliah","les","kursus","buku","gramedia"], cat:"Pendidikan" },
-  { kw:["kost","kontrakan","sewa","kpr","cicilan"], cat:"Tempat Tinggal" },
-  { kw:["salon","barber","potong","spa","facial","gym","fitness"], cat:"Perawatan" },
-  { kw:["gaji","salary","thr","bonus","insentif"], cat:"Gaji" },
-  { kw:["freelance","project","proyek","honor","fee","jasa"], cat:"Freelance" },
-  { kw:["transfer","kiriman","hadiah","kado"], cat:"Hadiah" },
-  { kw:["investasi","saham","reksa","deposito","dividen","bunga"], cat:"Investasi" },
+  { kw:["indomaret","alfamart","lawson","minimarket","superindo","giant","hypermart","carrefour","transmart","hero","lottemart","yogya","matahari","department"], cat:"Belanja Harian" },
+  { kw:["gofood","grabfood","shopeefood","kfc","mcdonalds","burger","pizza","starbucks","kopi","bakso","warteg","makan","resto","cafe","coffee","padang","nasi","sushi","ramen","boba","geprek","ayam","mie","soto","pempek","martabak","bubur","dim sum","hotpot","bbq"], cat:"Makan & Minum" },
+  { kw:["tokopedia","shopee","lazada","bukalapak","blibli","tiktok shop","zalora","uniqlo","zara","h&m","ikea","ace hardware","electronic city","erafone","ibox","apple store"], cat:"Belanja Online" },
+  { kw:["grab","gojek","ojek","maxim","busway","transjakarta","kereta","mrt","lrt","commuter","bensin","pertamina","shell","vivo","bp","parkir","tol","damri","angkot","becak","bajaj","taksi","blue bird","express","mypertamina"], cat:"Transportasi" },
+  { kw:["netflix","spotify","youtube","disney","vidio","game","bioskop","cinema","cgv","xxi","imax","platinum","ps4","ps5","playstation","nintendo","xbox","steam","valorant","mobile legend","mlbb","genshin","roblox","concert","konser","festival","event"], cat:"Hiburan" },
+  { kw:["pln","listrik","pdam","air","internet","wifi","indihome","telkom","xl","telkomsel","axis","smartfren","pulsa","token","by.u","im3","tri"], cat:"Tagihan" },
+  { kw:["apotek","klinik","dokter","rumah sakit","bpjs","obat","vitamin","halodoc","alodokter","kimia farma","guardian","century","suplemen","masker","antiseptik"], cat:"Kesehatan" },
+  { kw:["sekolah","kuliah","les","kursus","buku","gramedia","ruangguru","zenius","coursera","udemy","skillshare","seminar","workshop"], cat:"Pendidikan" },
+  { kw:["kost","kontrakan","sewa","kpr","cicilan","pdam","ipkl","ipl"], cat:"Tempat Tinggal" },
+  { kw:["salon","barber","potong","spa","facial","gym","fitness","pilates","yoga","nail art","skincare","wardah","emina","scarlett","body lotion","parfum","deodorant"], cat:"Perawatan" },
+  { kw:["gaji","salary","thr","bonus","insentif","rapel"], cat:"Gaji" },
+  { kw:["freelance","project","proyek","honor","fee","jasa","invoice","payment"], cat:"Freelance" },
+  { kw:["transfer","kiriman","hadiah","kado","angpau"], cat:"Hadiah" },
+  { kw:["investasi","saham","reksa","deposito","dividen","bunga","bibit","ajaib","stockbit","indopremier","sbr","obligasi","emas","logam mulia","antam"], cat:"Investasi" },
+  { kw:["mobil","motor","byd","tesla","xpander","avanza","fortuner","innova","hrv","crv","civic","pajero","veloz","rush","agya","brio","beat","vario","pcx","nmax","helm","ban","servis","bengkel"], cat:"Transportasi" },
+  { kw:["laptop","komputer","pc","monitor","keyboard","mouse","headphone","earphone","speaker","tv","kulkas","mesin cuci","ac","dispenser","rice cooker","blender","hp","handphone","tablet","iphone","samsung","xiaomi","oppo","vivo","realme"], cat:"Belanja Online" },
 ];
+
+// Suggest new category when nothing matches but note has specific product keywords
+const SUGGEST_RULES = [
+  { kw:["ps5","ps4","playstation","nintendo switch","xbox","steam deck"], sug:"Elektronik Hiburan" },
+  { kw:["mobil","motor","byd","tesla","xpander"], sug:"Kendaraan" },
+  { kw:["laptop","pc","komputer","monitor"], sug:"Elektronik Kerja" },
+];
+
+const suggestCategory = (note) => {
+  if(!note) return null;
+  const l = note.toLowerCase();
+  for(const r of SUGGEST_RULES) if(r.kw.some(k=>l.includes(k))) return r.sug;
+  return null;
+};
 const CATS_EXP = ["Makan & Minum","Belanja Harian","Belanja Online","Transportasi","Hiburan","Tagihan","Kesehatan","Pendidikan","Tempat Tinggal","Perawatan","Penyesuaian Saldo","Lainnya"];
 const CATS_INC = ["Gaji","Freelance","Hadiah","Investasi","Penyesuaian Saldo","Lainnya"];
 const CAT_ICON = (cat,sz=16,col="currentColor") => {
@@ -114,7 +187,7 @@ const CAT_ICON = (cat,sz=16,col="currentColor") => {
     "Makan & Minum":<Coffee {...p}/>,"Belanja Harian":<ShoppingCart {...p}/>,"Belanja Online":<ShoppingBag {...p}/>,
     "Transportasi":<Car {...p}/>,"Hiburan":<Monitor {...p}/>,"Tagihan":<Zap {...p}/>,
     "Kesehatan":<Heart {...p}/>,"Pendidikan":<BookOpen {...p}/>,"Tempat Tinggal":<Home {...p}/>,
-    "Perawatan":<Scissors {...p}/>,"Gaji":<Briefcase {...p}/>,"Freelance":<Monitor {...p}/>,
+    "Perawatan":<Scissors {...p}/>,"Gaji":<Briefcase {...p}/>,"Freelance":<PiggyBank {...p}/>,
     "Hadiah":<Gift {...p}/>,"Investasi":<TrendingUp {...p}/>,"Lainnya":<MoreHorizontal {...p}/>,
     "Penyesuaian Saldo":<Sliders {...p}/>,
   })[cat] || <MoreHorizontal {...p}/>;
@@ -209,8 +282,8 @@ const verifyBiometrics = async () => {
 };
 
 const fmt       = n => "Rp " + Math.abs(n).toLocaleString("id-ID");
-const fmtShort  = n => n>=1e9?(n/1e9).toFixed(1)+"M":n>=1e6?(n/1e6).toFixed(1)+"Jt":n>=1e3?(n/1e3).toFixed(0)+"K":String(n);
-const mask      = n => "Rp " + "•".repeat(Math.min(7,String(Math.round(n)).length));
+const fmtShort  = n => { const abs=Math.abs(n); if(abs>=1e9)return(n/1e9).toFixed(1).replace(/\.0$/,"")+"M"; if(abs>=1e6)return(n/1e6).toFixed(1).replace(/\.0$/,"")+"jt"; if(abs>=1e3)return(n/1e3).toFixed(1).replace(/\.0$/,"")+"rb"; return String(n); };
+const mask      = _ => "Rp ••••";
 
 const getLocalISOString = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10);
 const todayStr  = () => getLocalISOString();
@@ -254,8 +327,48 @@ const hashPin = async pin => {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 };
 
+let _audioCtx = null;
+const getAudioCtx = () => {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _audioCtx;
+  } catch {
+    return null;
+  }
+};
+
 const playTxnSound = type => {
-  try { const ctx=new(window.AudioContext||window.webkitAudioContext)(); const osc=ctx.createOscillator(); const gain=ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.type="sine"; if(type==="expense"){osc.frequency.setValueAtTime(523,ctx.currentTime);osc.frequency.exponentialRampToValueAtTime(262,ctx.currentTime+0.35);}else{osc.frequency.setValueAtTime(330,ctx.currentTime);osc.frequency.exponentialRampToValueAtTime(660,ctx.currentTime+0.35);} gain.gain.setValueAtTime(0.22,ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4); osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.4); } catch {}
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+
+    const t0 = ctx.currentTime;
+
+    if (type === "expense") {
+      // Expense: soft "bloop–down" (3 notes descending)
+      osc.frequency.setValueAtTime(660, t0);
+      osc.frequency.linearRampToValueAtTime(440, t0 + 0.12);
+      osc.frequency.linearRampToValueAtTime(330, t0 + 0.24);
+    } else {
+      // Income: "bloop–cling" (3 notes up ending in bright high note)
+      osc.frequency.setValueAtTime(392, t0);
+      osc.frequency.linearRampToValueAtTime(523.25, t0 + 0.12);
+      osc.frequency.linearRampToValueAtTime(784, t0 + 0.24);
+    }
+
+    gain.gain.setValueAtTime(0.0, t0);
+    gain.gain.linearRampToValueAtTime(0.25, t0 + 0.05);
+    gain.gain.linearRampToValueAtTime(0.0, t0 + 0.35);
+
+    osc.start(t0);
+    osc.stop(t0 + 0.4);
+  } catch {}
 };
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
@@ -276,6 +389,67 @@ const BottomSheet = ({onClose,title,children}) => (
   </div>
 );
 
+function TransferModal({ accounts, onClose, onTransfer }) {
+  const [fromId, setFromId] = useState(accounts[0]?.id ? String(accounts[0].id) : "");
+  const [toId, setToId]     = useState(accounts[1]?.id ? String(accounts[1].id) : "");
+  const [amountStr, setAmountStr] = useState("");
+  const [note, setNote] = useState("");
+
+  const handleSubmit = () => {
+    const amount = parseNum(amountStr);
+    if (!amount || !fromId || !toId || fromId === toId) return;
+    onTransfer({ fromId, toId, amount, note });
+  };
+
+  return (
+    <BottomSheet onClose={onClose} title="Transfer Antar Akun">
+      {accounts.length < 2
+        ? <Card><p style={{margin:0,fontSize:13,color:"#6b7280"}}>Minimal butuh 2 akun untuk transfer.</p></Card>
+        : <>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <Inp label="DARI AKUN" mb={0}>
+                <select value={fromId} onChange={e=>setFromId(e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>
+                  {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </Inp>
+              <Inp label="KE AKUN" mb={0}>
+                <select value={toId} onChange={e=>setToId(e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>
+                  {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </Inp>
+            </div>
+            <Inp label="JUMLAH (RP)">
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span>
+                <input
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={amountStr}
+                  onChange={e=>setAmountStr(fmtNum(e.target.value))}
+                  style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:22,fontWeight:800,color:"#111"}}
+                />
+              </div>
+            </Inp>
+            <Inp label="CATATAN (OPSIONAL)" mb={16}>
+              <input
+                value={note}
+                onChange={e=>setNote(e.target.value)}
+                placeholder="cth: Untuk tabungan, bayar kartu kredit..."
+                style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}
+              />
+            </Inp>
+            <BtnG
+              onClick={handleSubmit}
+              disabled={!parseNum(amountStr) || !fromId || !toId || fromId===toId}
+            >
+              Transfer Sekarang
+            </BtnG>
+          </>
+      }
+    </BottomSheet>
+  );
+}
+
 const ConfirmDialog = ({title,sub,onConfirm,onCancel,danger=true,confirmLabel="Ya, Lanjutkan"}) => (
   <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
     <div style={{background:"#fff",borderRadius:20,padding:"24px",maxWidth:340,width:"100%",textAlign:"center"}}>
@@ -290,7 +464,18 @@ const ConfirmDialog = ({title,sub,onConfirm,onCancel,danger=true,confirmLabel="Y
   </div>
 );
 
-// ─── DOMPETKU LOGO SVG ────────────────────────────────────────────────────────
+// ─── FONT INJECTION ──────────────────────────────────────────────────────────
+function FontLoader() {
+  useEffect(() => {
+    if (document.getElementById("outfit-font")) return;
+    const link = document.createElement("link");
+    link.id = "outfit-font";
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap";
+    document.head.appendChild(link);
+  }, []);
+  return null;
+}
 function DompetKuLogo({ size=28, color="#fff" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
@@ -354,7 +539,7 @@ function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, o
         {[1,2,3,4,5,6,7,8,9, (mode==="unlock" && bioEnabled ? "BIO" : ""), 0, "⌫"].map((d,i)=>(
           <button type="button" key={i} onClick={()=>d==="⌫"?del():d==="BIO"?handleBio():d!==""?handleDigit(String(d)):null} disabled={d===""}
             style={{height:64,borderRadius:16,background:d==="⌫"||d==="BIO"?"rgba(255,255,255,0.15)":d===""?"transparent":"rgba(255,255,255,0.2)",border:"none",color:"#fff",fontSize:d==="⌫"?18:22,fontWeight:700,cursor:d===""?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {d==="⌫" ? <Trash2 size={20} strokeWidth={2}/> : d==="BIO" ? <Fingerprint size={26} strokeWidth={1.8}/> : d}
+            {d==="⌫" ? <ChevronLeft size={22} strokeWidth={2}/> : d==="BIO" ? <Fingerprint size={26} strokeWidth={1.8}/> : d}
           </button>
         ))}
       </div>
@@ -364,34 +549,110 @@ function PinScreen({ mode="unlock", savedHash, bioEnabled, onUnlock, onSetPin, o
 }
 
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
+const JOBS = ["Pelajar / Mahasiswa","Guru / Dosen","PNS / ASN","Karyawan Swasta","Wiraswasta / Pengusaha","Freelancer","Dokter / Tenaga Medis","Engineer / Programmer","Desainer / Kreator","Buruh / Pekerja Harian","Ibu Rumah Tangga","Pensiunan","Belum Bekerja","Lainnya"];
+const EDUS = ["SD / Sederajat","SMP / Sederajat","SMA / SMK / Sederajat","Diploma (D1-D3)","Sarjana (S1)","Magister (S2)","Doktor (S3)","Tidak Ingin Menyebutkan"];
+
 function OnboardingScreen({ onDone }) {
-  const [step,setStep]=useState(0); const [name,setName]=useState("");
+  const [step,setStep]=useState(0);
+  const [name,setName]=useState("");
+  const [age,setAge]=useState("");
+  const [job,setJob]=useState("");
+  const [edu,setEdu]=useState("");
+  const touchStartX=useRef(0);
   const slides=[
     {icon:"💰",title:"Catat Keuanganmu",desc:"Lacak setiap pemasukan dan pengeluaran dengan mudah dan cepat."},
     {icon:"📊",title:"Analisis Pengeluaran",desc:"Visualisasi lengkap kategori pengeluaranmu setiap bulan."},
     {icon:"🎯",title:"Capai Target Tabungan",desc:"Set budget bulanan dan pantau progress tabunganmu."},
   ];
-  const last=step===slides.length;
+  // steps: 0,1,2 = slides; 3=nama; 4=umur; 5=pekerjaan; 6=pendidikan
+  const TOTAL_PROFILE_STEPS = 4; // name, age, job, edu
+  const inSlides = step < slides.length;
+  const profileStep = step - slides.length; // 0..3
+
+  const handleTouchStart = e => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = e => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 50 && inSlides) {
+      if (dx < 0 && step < slides.length - 1) setStep(s=>s+1);
+      else if (dx > 0 && step > 0) setStep(s=>s-1);
+    }
+  };
+
+  const canNext = () => {
+    if(inSlides) return true;
+    if(profileStep===0) return !!name.trim();
+    if(profileStep===1) return !!age;
+    if(profileStep===2) return !!job;
+    if(profileStep===3) return !!edu;
+    return true;
+  };
+
+  const handleNext = () => {
+    if(!canNext()) return;
+    const totalSteps = slides.length + TOTAL_PROFILE_STEPS;
+    if(step < totalSteps - 1) { setStep(s=>s+1); return; }
+    onDone({ name:name.trim(), age:parseInt(age)||0, job, edu });
+  };
+
+  const inputStyle = {width:"100%",background:"rgba(255,255,255,0.2)",border:"2px solid rgba(255,255,255,0.3)",borderRadius:16,padding:"16px",color:"#fff",fontSize:18,fontWeight:700,outline:"none",marginBottom:16,boxSizing:"border-box"};
+  const selectStyle = {width:"100%",background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.3)",borderRadius:16,padding:"14px 16px",color:"#fff",fontSize:15,fontWeight:600,outline:"none",marginBottom:16,boxSizing:"border-box",WebkitAppearance:"none"};
+
   return (
-    <div style={{fontFamily:"'Outfit',sans-serif",background:`linear-gradient(160deg,${G},${G2})`,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,maxWidth:430,margin:"0 auto"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-      {!last ? (
-        <div style={{textAlign:"center"}}>
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{fontFamily:"'Outfit',sans-serif",background:`linear-gradient(160deg,${G},${G2})`,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,maxWidth:430,margin:"0 auto"}}>
+      <FontLoader/>
+      {inSlides ? (
+        <div style={{textAlign:"center",width:"100%"}}>
           <div style={{fontSize:72,marginBottom:24}}>{slides[step].icon}</div>
           <p style={{color:"#fff",fontSize:22,fontWeight:800,margin:"0 0 12px"}}>{slides[step].title}</p>
           <p style={{color:"rgba(255,255,255,0.8)",fontSize:15,marginBottom:40,lineHeight:1.6}}>{slides[step].desc}</p>
           <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:32}}>
             {slides.map((_,i)=><div key={i} style={{width:i===step?24:8,height:8,borderRadius:4,background:i===step?"#fff":"rgba(255,255,255,0.4)",transition:"width .3s"}}/>)}
           </div>
-          <BtnG onClick={()=>setStep(s=>s+1)} style={{background:"rgba(255,255,255,0.25)",boxShadow:"none"}}>Lanjut →</BtnG>
+          <p style={{color:"rgba(255,255,255,0.5)",fontSize:12,marginBottom:12}}>Swipe atau tekan Lanjut</p>
+          <BtnG onClick={handleNext} style={{background:"rgba(255,255,255,0.25)",boxShadow:"none"}}>Lanjut →</BtnG>
         </div>
       ) : (
         <div style={{width:"100%"}}>
-          <DompetKuLogo size={52}/>
-          <p style={{color:"#fff",fontSize:24,fontWeight:800,marginTop:16,marginBottom:8}}>Siapa namamu?</p>
-          <p style={{color:"rgba(255,255,255,0.75)",fontSize:14,marginBottom:24}}>Kami akan menyapa kamu dengan nama ini</p>
-          <input value={name} onChange={e=>setName(e.target.value)} placeholder="Nama kamu..." style={{width:"100%",background:"rgba(255,255,255,0.2)",border:"2px solid rgba(255,255,255,0.3)",borderRadius:16,padding:"16px",color:"#fff",fontSize:18,fontWeight:700,outline:"none",marginBottom:16,boxSizing:"border-box"}}/>
-          <BtnG onClick={()=>name.trim()&&onDone(name.trim())} disabled={!name.trim()} style={{background:"rgba(255,255,255,0.25)",boxShadow:"none"}}>Mulai Sekarang →</BtnG>
+          <DompetKuLogo size={44}/>
+          {/* Progress dots for profile steps */}
+          <div style={{display:"flex",gap:8,marginTop:16,marginBottom:24}}>
+            {Array.from({length:TOTAL_PROFILE_STEPS}).map((_,i)=><div key={i} style={{flex:i===profileStep?2:1,height:4,borderRadius:4,background:i<=profileStep?"#fff":"rgba(255,255,255,0.3)",transition:"all .3s"}}/>)}
+          </div>
+
+          {profileStep===0&&(<>
+            <p style={{color:"#fff",fontSize:24,fontWeight:800,margin:"0 0 8px"}}>Siapa namamu?</p>
+            <p style={{color:"rgba(255,255,255,0.75)",fontSize:14,marginBottom:20}}>Kami akan menyapamu dengan nama ini.</p>
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="Nama kamu..." style={inputStyle}/>
+          </>)}
+
+          {profileStep===1&&(<>
+            <p style={{color:"#fff",fontSize:24,fontWeight:800,margin:"0 0 8px"}}>Berapa umurmu?</p>
+            <p style={{color:"rgba(255,255,255,0.75)",fontSize:14,marginBottom:20}}>Membantu kami menyesuaikan analisis keuangan.</p>
+            <input type="number" min="10" max="100" value={age} onChange={e=>setAge(e.target.value)} placeholder="Contoh: 22" style={inputStyle}/>
+          </>)}
+
+          {profileStep===2&&(<>
+            <p style={{color:"#fff",fontSize:24,fontWeight:800,margin:"0 0 8px"}}>Pekerjaanmu sekarang?</p>
+            <p style={{color:"rgba(255,255,255,0.75)",fontSize:14,marginBottom:20}}>Untuk analisis gaya hidup yang akurat.</p>
+            <select value={job} onChange={e=>setJob(e.target.value)} style={selectStyle}>
+              <option value="" style={{color:"#999"}}>Pilih pekerjaan...</option>
+              {JOBS.map(j=><option key={j} value={j} style={{color:"#111"}}>{j}</option>)}
+            </select>
+          </>)}
+
+          {profileStep===3&&(<>
+            <p style={{color:"#fff",fontSize:24,fontWeight:800,margin:"0 0 8px"}}>Pendidikan terakhirmu?</p>
+            <p style={{color:"rgba(255,255,255,0.75)",fontSize:14,marginBottom:20}}>Digunakan untuk rekomendasi karir yang relevan.</p>
+            <select value={edu} onChange={e=>setEdu(e.target.value)} style={selectStyle}>
+              <option value="" style={{color:"#999"}}>Pilih pendidikan...</option>
+              {EDUS.map(e=><option key={e} value={e} style={{color:"#111"}}>{e}</option>)}
+            </select>
+          </>)}
+
+          <div style={{display:"flex",gap:10}}>
+            {step>0&&<button type="button" onClick={()=>setStep(s=>s-1)} style={{flex:1,padding:"14px",background:"rgba(255,255,255,0.15)",border:"none",borderRadius:14,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>← Kembali</button>}
+            <BtnG onClick={handleNext} disabled={!canNext()} style={{flex:2,background:"rgba(255,255,255,0.25)",boxShadow:"none"}}>{profileStep===TOTAL_PROFILE_STEPS-1?"Mulai Sekarang →":"Lanjut →"}</BtnG>
+          </div>
         </div>
       )}
     </div>
@@ -425,7 +686,7 @@ function BudgetModal({ totalBalance, currentBudget, savedPct, onApply, onClose }
       </Card>
       <Card style={{marginBottom:14}}>
         <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#9ca3af",letterSpacing:.5}}>ANALISIS REKOMENDASI</p>
-        {[{label:"Ditabung",val:saving,col:"#8b5cf6"},{label:"Bisa Dibelanjakan",val:spendable,col:G},{label:"Budget Bulanan Ideal",val:spendable,col:G,bold:true},{label:"Limit Harian Ideal",val:sugDaily,col:"#f97316"}].map(r=>(
+        {[{label:"Ditabung",val:saving,col:G2},{label:"Bisa Dibelanjakan",val:spendable,col:G},{label:"Budget Final Dipakai",val:finalBudget,col:G,bold:true},{label:"Limit Harian Ideal",val:sugDaily,col:G2}].map(r=>(
           <Row key={r.label} style={{marginBottom:6}}><span style={{fontSize:12,color:"#6b7280"}}>{r.label}</span><span style={{fontSize:r.bold?14:12,fontWeight:r.bold?800:700,color:r.col}}>{fmt(r.val)}</span></Row>
         ))}
       </Card>
@@ -562,7 +823,7 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
 }
 
 // ─── TXN DETAIL SHEET ─────────────────────────────────────────────────────────
-function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
+function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete, onSaveDetails }) {
   const acc      = accounts.find(a=>String(a.id)===String(txn.accountId));
   const fields   = getTxnDetailFields(txn);
   const [details, setDetails] = useState(txn.details || {});
@@ -578,7 +839,7 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
     return () => { active = false; };
   },[txn.id, txn.attachmentMeta]); 
   
-  const save = () => { onEdit({...txn, details}); setEditing(false); };
+  const save = () => { if(onSaveDetails) onSaveDetails(txn.id, details); setEditing(false); };
   const grad = acc ? getAccGrad(acc, accounts.indexOf(acc)) : `linear-gradient(135deg,${G},${G2})`;
 
   return (
@@ -642,14 +903,35 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete }) {
 }
 
 // ─── ADD / EDIT TRANSACTION MODAL ─────────────────────────────────────────────
-function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingFile }) {
+function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingFile, openFilePicker }) {
   const isEdit = !!initial;
-  const [form, setForm] = useState(() => initial || { type:"expense", amountStr:"", category:"Makan & Minum", note:"", date:todayStr(), time:nowTime(), accountId:String(accounts[0]?.id), attachmentMeta:[], details: {} });
+  const [form, setForm] = useState(() => ({
+    type:"expense",
+    amountStr:"",
+    category:"Makan & Minum",
+    note:"",
+    date:todayStr(),
+    time:nowTime(),
+    accountId:String(accounts[0]?.id),
+    attachmentMeta:[],
+    details: {},
+    ...(initial || {}),
+  }));
   const [detected, setDetected] = useState(null);
   const fileRef = useRef();
   const s = (k,v) => setForm(f=>({...f,[k]:v}));
 
-  const handleNote = v => { s("note",v); const d=smartDetect(v); setDetected(d); if(d)setForm(f=>({...f,note:v,category:d.cat})); };
+  const [sugCat, setSugCat] = useState(null);
+  const handleNote = v => { 
+    s("note",v); 
+    const d=smartDetect(v); 
+    setDetected(d); 
+    if(d){setForm(f=>({...f,note:v,category:d.cat}));setSugCat(null);}
+    else{
+      const sug=suggestCategory(v);
+      setSugCat(sug&&!CATS_EXP.includes(sug)?sug:null);
+    }
+  };
   const handleAmt  = e => { const raw=e.target.value.replace(/\D/g,""); s("amountStr",raw?parseInt(raw).toLocaleString("id-ID"):""); };
   
   const handleFile = async e => {
@@ -676,16 +958,53 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
   };
 
   const cats=form.type==="expense"?CATS_EXP:CATS_INC;
+  const [txType, setTxType] = useState(()=>initial?.type==="transfer"?"transfer":(initial?.type||"expense"));
+  const [trFromId, setTrFromId] = useState(()=>accounts[0]?.id?String(accounts[0].id):"");
+  const [trToId,   setTrToId]   = useState(()=>accounts[1]?.id?String(accounts[1].id):"");
+  const [trAmt,    setTrAmt]    = useState("");
+  const [trNote,   setTrNote]   = useState("");
+
+  const submitTransfer = () => {
+    const amount = parseNum(trAmt||"0");
+    if(!amount||!trFromId||!trToId||trFromId===trToId)return;
+    onSave({type:"transfer",fromId:trFromId,toId:trToId,amount,note:trNote});
+  };
+
   return (
     <BottomSheet onClose={onClose} title={isEdit?"Edit Transaksi":"Catat Transaksi"}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,marginBottom:14,background:"#e5e7eb",borderRadius:14,padding:4}}>
-        {["expense","income"].map(type=>(
-          <button type="button" key={type} onClick={()=>setForm(f=>({...f,type,category:type==="expense"?"Makan & Minum":"Gaji"}))} style={{padding:"10px",border:"none",borderRadius:11,background:form.type===type?"#fff":"transparent",color:form.type===type?"#111":"#9ca3af",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:form.type===type?"0 1px 4px rgba(0,0,0,0.08)":"none"}}>{type==="expense"?"Pengeluaran":"Pemasukan"}</button>
+      <div style={{position:"relative",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",marginBottom:14,background:"#e5e7eb",borderRadius:14,padding:4}}>
+        <div style={{position:"absolute",top:4,left:4,width:"calc(33.33% - 5.33px)",height:"calc(100% - 8px)",background:"#fff",borderRadius:11,boxShadow:"0 1px 4px rgba(0,0,0,0.10)",transform:`translateX(calc(${txType==="expense"?0:txType==="income"?1:2} * (100% + 2.66px)))`,transition:"transform 0.28s cubic-bezier(0.34,1.56,0.64,1)",pointerEvents:"none",willChange:"transform"}}/>
+        {[{v:"expense",l:"Pengeluaran"},{v:"income",l:"Pemasukan"},{v:"transfer",l:"Transfer"}].map(({v,l})=>(
+          <button type="button" key={v} onClick={()=>{setTxType(v);setForm(f=>({...f,type:v,category:v==="expense"?"Makan & Minum":v==="income"?"Gaji":f.category}));}} style={{padding:"9px 4px",border:"none",borderRadius:11,background:"transparent",color:txType===v?"#111":"#9ca3af",fontSize:12,fontWeight:700,cursor:"pointer",position:"relative",zIndex:1,transition:"color 0.2s"}}>{l}</button>
         ))}
       </div>
+      {txType==="transfer"&&(
+        <div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            {[{label:"DARI AKUN",val:trFromId,set:setTrFromId},{label:"KE AKUN",val:trToId,set:setTrToId}].map(({label,val,set})=>{
+              const selAcc=accounts.find(a=>String(a.id)===String(val));
+              const grad=selAcc?getAccGrad(selAcc,accounts.indexOf(selAcc)):"#e5e7eb";
+              return(
+              <div key={label} style={{borderRadius:14,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}>
+                <div style={{background:grad,padding:"8px 12px 4px"}}><p style={{margin:0,fontSize:9,fontWeight:800,color:"rgba(255,255,255,0.8)",letterSpacing:.6}}>{label}</p><p style={{margin:"2px 0 0",fontSize:13,fontWeight:800,color:"#fff"}}>{selAcc?.name||"—"}</p></div>
+                <select value={val} onChange={e=>set(e.target.value)} style={{width:"100%",background:"#f8fafc",border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#374151",padding:"8px 12px",WebkitAppearance:"none",cursor:"pointer"}}>
+                  {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              );
+            })}
+          </div>
+          <Inp label="JUMLAH (RP)"><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span><input inputMode="numeric" placeholder="0" value={trAmt} onChange={e=>setTrAmt(fmtNum(e.target.value))} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:28,fontWeight:800,color:"#111"}}/></div></Inp>
+          <Inp label="CATATAN (OPSIONAL)" mb={18}><input value={trNote} onChange={e=>setTrNote(e.target.value)} placeholder="cth: Untuk tabungan..." style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/></Inp>
+          <BtnG onClick={submitTransfer} disabled={!parseNum(trAmt)||trFromId===trToId}>Transfer Sekarang</BtnG>
+        </div>
+      )}
+      {txType!=="transfer"&&(
+      <div>
       <Inp label="JUMLAH (RP)"><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span><input inputMode="numeric" placeholder="0" value={form.amountStr||""} onChange={handleAmt} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:28,fontWeight:800,color:"#111"}}/></div></Inp>
       <Inp label="CATATAN / NAMA TOKO" mb={detected?6:10}><input placeholder="cth: Indomaret, GoFood..." value={form.note||""} onChange={e=>handleNote(e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/></Inp>
       {detected&&<div style={{display:"flex",alignItems:"center",gap:7,padding:"8px 13px",background:GL,borderRadius:11,marginBottom:10,border:`1px solid ${GM}`}}><Check size={13} color={G}/><span style={{color:G,fontSize:12,fontWeight:600}}>Auto-detect: {detected.cat}</span></div>}
+      {!detected&&sugCat&&<div style={{display:"flex",alignItems:"center",gap:7,padding:"8px 13px",background:"#fff3cd",borderRadius:11,marginBottom:10,border:"1px solid #fde68a"}}><Star size={13} color="#f59e0b"/><span style={{color:"#92400e",fontSize:12,fontWeight:600}}>Saran kategori: <b>{sugCat}</b></span><button type="button" onClick={()=>{setSugCat(null);s("category","Lainnya");}} style={{marginLeft:"auto",background:"none",border:"none",fontSize:10,color:"#9ca3af",cursor:"pointer"}}>✕</button></div>}
       <Inp label="KATEGORI">
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
           {cats.map(c=>(
@@ -699,7 +1018,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
       </div>
       <Inp label="JAM" mb={10}><input type="time" value={form.time||nowTime()} onChange={e=>s("time",e.target.value)} style={{background:"transparent",border:"none",outline:"none",fontSize:14,fontWeight:600,color:"#111",colorScheme:"light"}}/></Inp>
       <Inp label="LAMPIRAN (OPSIONAL)" mb={18}>
-        <Row><p style={{margin:0,fontSize:12,color:"#9ca3af"}}>Foto struk, dll.</p><button type="button" onClick={()=>{isPickingFile.current=true;fileRef.current.click();}} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Upload size={12}/> Tambah</button></Row>
+        <Row><p style={{margin:0,fontSize:12,color:"#9ca3af"}}>Foto struk, dll.</p><button type="button" onClick={()=>openFilePicker(fileRef.current)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Upload size={12}/> Tambah</button></Row>
         <input ref={fileRef} type="file" accept="image/*,.pdf" multiple style={{display:"none"}} onChange={handleFile}/>
         {(form.attachmentMeta||[]).length>0&&(
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
@@ -708,6 +1027,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
         )}
       </Inp>
       <BtnG onClick={submit} disabled={accounts.length===0}>{isEdit?"Simpan Perubahan":"Simpan Transaksi"}</BtnG>
+      </div>)}
     </BottomSheet>
   );
 }
@@ -725,8 +1045,9 @@ function AttachPreview({ id, type }) {
 }
 
 // ─── IMPORT MODAL ─────────────────────────────────────────────────────────────
-function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
+function ImportModal({ accounts, onClose, onImport, isPickingFile, openFilePicker }) {
   const [st,setSt]=useState("idle"),[preview,setPreview]=useState([]),[err,setErr]=useState("");
+  const [targetAccId, setTargetAccId] = useState(() => accounts[0] ? String(accounts[0].id) : "");
   const ref=useRef();
   const parse=async e=>{
     isPickingFile.current=false;
@@ -751,7 +1072,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
         const rt=ti>=0?String(row[ti]).toLowerCase():"";const isInc=rt.includes("income")||rt.includes("masuk")||rt.includes("pemasukan");
         let pd=todayStr();if(di>=0&&row[di]){try{const d=new Date(row[di]);if(!isNaN(d))pd=getLocalISOString(d);}catch{}}
         const rc=ci>=0?String(row[ci]):"";const cat=Object.keys(CAT_BG).find(k=>rc.toLowerCase().includes(k.toLowerCase()))||"Lainnya";
-        parsed.push({id:generateId(),type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"",accountId:String(accounts[0].id),detected:null,attachmentMeta:[]});
+        parsed.push({id:generateId(),type:isInc?"income":"expense",amount:Math.abs(amt),category:cat,note:ni>=0?String(row[ni]):"Import",date:pd,time:"",accountId:targetAccId||String(accounts[0].id),detected:null,attachmentMeta:[]});
       }
       if(!parsed.length){setErr("Tidak ada data valid.");setSt("error");return;}
       setPreview(parsed);setSt("preview");
@@ -759,17 +1080,32 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile }) {
   };
   return(
     <BottomSheet onClose={onClose} title="Import Data">
-      {st==="idle"&&<div><div style={{background:GL,borderRadius:13,padding:"13px 15px",marginBottom:14,border:`1px solid ${GM}`}}><p style={{margin:"0 0 5px",fontSize:13,fontWeight:700,color:G}}>Format yang Didukung</p><p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>Money Manager → Settings → Backup → Export Excel (.xlsx)</p></div><BtnG onClick={()=>{isPickingFile.current=true;ref.current.click();}}>Pilih File Excel</BtnG><input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={parse}/></div>}
+      {st==="idle"&&<div>
+        <div style={{background:GL,borderRadius:13,padding:"13px 15px",marginBottom:14,border:`1px solid ${GM}`}}><p style={{margin:"0 0 5px",fontSize:13,fontWeight:700,color:G}}>Format yang Didukung</p><p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>Money Manager → Settings → Backup → Export Excel (.xlsx)</p></div>
+        {accounts.length > 1 && (
+          <Inp label="MASUKKAN KE AKUN" mb={14}>
+            <select value={targetAccId} onChange={e=>setTargetAccId(e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,fontWeight:600,color:"#111",WebkitAppearance:"none"}}>
+              {accounts.map(a=><option key={a.id} value={String(a.id)}>{a.name}</option>)}
+            </select>
+          </Inp>
+        )}
+        <BtnG onClick={()=>openFilePicker(ref.current)}>Pilih File Excel</BtnG>
+        <input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={parse}/>
+      </div>}
       {st==="parsing"&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:36,animation:"spin 1.5s linear infinite",display:"inline-block"}}>⚙️</div><p style={{color:G,marginTop:12}}>Membaca file...</p></div>}
       {st==="error"&&<div style={{textAlign:"center",padding:"20px 0"}}><div style={{color:"#ef4444",display:"flex",justifyContent:"center",marginBottom:12}}><AlertTriangle size={40}/></div><p style={{color:"#ef4444",fontWeight:600,marginBottom:20}}>{err}</p><BtnG onClick={()=>{setSt("idle");setErr("");}}>Coba Lagi</BtnG></div>}
-      {st==="preview"&&<div><div style={{background:GL,borderRadius:12,padding:"11px 14px",marginBottom:12,border:`1px solid ${GM}`}}><p style={{margin:0,fontSize:13,fontWeight:700,color:G}}>✓ {preview.length} transaksi ditemukan</p></div><Card style={{padding:"4px 0",marginBottom:12,maxHeight:200,overflowY:"auto"}}>{preview.slice(0,5).map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<4?"1px solid #f8fafc":"none"}}><CatBub cat={t.category} size={36}/><div style={{flex:1,minWidth:0}}><p style={{margin:0,fontSize:12,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note}</p><p style={{margin:0,fontSize:11,color:"#9ca3af"}}>{t.date}</p></div><span style={{fontSize:12,fontWeight:700,color:t.type==="income"?G:"#ef4444",flexShrink:0}}>{t.type==="income"?"+":"-"}{fmtShort(t.amount)}</span></div>)}{preview.length>5&&<p style={{textAlign:"center",color:"#9ca3af",fontSize:11,padding:"8px"}}>...+{preview.length-5} lainnya</p>}</Card><BtnG onClick={()=>{onImport(preview);setSt("done");}}>Import {preview.length} Transaksi</BtnG></div>}
+      {st==="preview"&&<div>
+        <div style={{background:GL,borderRadius:12,padding:"11px 14px",marginBottom:12,border:`1px solid ${GM}`}}><p style={{margin:0,fontSize:13,fontWeight:700,color:G}}>✓ {preview.length} transaksi ditemukan</p>{accounts.length>1&&<p style={{margin:"3px 0 0",fontSize:11,color:"#6b7280"}}>→ Akun: <b>{accounts.find(a=>String(a.id)===targetAccId)?.name}</b></p>}</div>
+        <Card style={{padding:"4px 0",marginBottom:12,maxHeight:200,overflowY:"auto"}}>{preview.slice(0,5).map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<4?"1px solid #f8fafc":"none"}}><CatBub cat={t.category} size={36}/><div style={{flex:1,minWidth:0}}><p style={{margin:0,fontSize:12,fontWeight:600,color:"#111",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.note}</p><p style={{margin:0,fontSize:11,color:"#9ca3af"}}>{t.date}</p></div><span style={{fontSize:12,fontWeight:700,color:t.type==="income"?G:"#ef4444",flexShrink:0}}>{t.type==="income"?"+":"-"}{fmtShort(t.amount)}</span></div>)}{preview.length>5&&<p style={{textAlign:"center",color:"#9ca3af",fontSize:11,padding:"8px"}}>...+{preview.length-5} lainnya</p>}</Card>
+        <BtnG onClick={()=>{onImport(preview);setSt("done");}}>Import {preview.length} Transaksi</BtnG>
+      </div>}
       {st==="done"&&<div style={{textAlign:"center",padding:"30px 0"}}><div style={{color:G,display:"flex",justifyContent:"center",marginBottom:12}}><Check size={52}/></div><p style={{fontSize:16,fontWeight:800,color:"#111",margin:"0 0 6px"}}>Import Berhasil!</p><BtnG onClick={onClose} style={{marginTop:16}}>Selesai</BtnG></div>}
     </BottomSheet>
   );
 }
 
 // ─── ACCOUNT DETAIL SCREEN ────────────────────────────────────────────────────
-function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAccount }) {
+function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAccount, onDirectEdit }) {
   const txns   = [...transactions].filter(t=>String(t.accountId)===String(account.id)).sort(sortByDateDesc);
   const income  = txns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const expense = txns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
@@ -787,7 +1123,7 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
     <div style={{position:"fixed",inset:0,background:BG,zIndex:150,maxWidth:430,margin:"0 auto",overflowY:"auto",paddingBottom:30}}>
       <div style={{background:grad,padding:"calc(env(safe-area-inset-top,0px) + 14px) 16px 24px",position:"relative"}}>
         <button type="button" onClick={onClose} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",left:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><ChevronLeft size={20}/></button>
-        <button type="button" onClick={onEditAccount} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",right:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Pencil size={15}/></button>
+        <button type="button" onClick={()=>onDirectEdit?onDirectEdit({acc:account,idx:accIdx}):onEditAccount?.()} style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 14px)",right:16,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#fff"}}><Pencil size={15}/></button>
         <div style={{textAlign:"center",paddingTop:16}}>
           <div style={{width:54,height:54,borderRadius:16,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",color:"#fff"}}>
             {account.iconImg?<img src={account.iconImg} alt="" style={{width:38,height:38,borderRadius:10,objectFit:"cover"}}/>:(()=>{const T=ACC_TYPES.find(t=>t.type===account.type);return T?<T.Icon s={24}/>:null;})()}
@@ -801,7 +1137,7 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
             <div key={x.l} style={{background:"rgba(255,255,255,0.15)",borderRadius:12,padding:"10px 14px",textAlign:"center"}}><p style={{color:"rgba(255,255,255,0.7)",fontSize:10,fontWeight:600,margin:"0 0 3px"}}>{x.l}</p><p style={{color:"#fff",fontSize:13,fontWeight:800,margin:0}}>{fmtShort(x.v)}</p></div>
           ))}
         </div>
-        {isLinkable&&(<button type="button" onClick={openApp} style={{width:"100%",marginTop:14,padding:"11px",background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.4)",borderRadius:13,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><ExternalLink size={15}/> Buka {deepLink?.label||"Aplikasi"}</button>)}
+        {isLinkable && deepLink && (<button type="button" onClick={openApp} style={{width:"100%",marginTop:14,padding:"11px",background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.4)",borderRadius:13,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><ExternalLink size={15}/> Buka {deepLink.label}</button>)}
       </div>
       <div style={{padding:"16px 16px 0"}}>
         <p style={{margin:"0 0 10px",fontSize:14,fontWeight:700,color:"#111"}}>Riwayat Transaksi</p>
@@ -821,12 +1157,18 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
 }
 
 // ─── HOME SCREEN ──────────────────────────────────────────────────────────────
-function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, savedPct, setSavedPct, userName, userAvatar, setTab, setTxnFilter, setSelectedAcc, hidden, setHidden, onTxnClick }) {
+function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, savedPct, setSavedPct, userName, userAvatar, setTab, setTxnFilter, setSelectedAcc, hidden, setHidden, onTxnClick, registerLocalModal, unregisterLocalModal }) {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const openBudget = () => { setShowBudgetModal(true); registerLocalModal?.(()=>setShowBudgetModal(false)); };
+  const closeBudget = () => { setShowBudgetModal(false); unregisterLocalModal?.(); };
 
   const totalBalance = accounts.reduce((s,a)=>s+a.balance,0);
-  const totalIncome  = transactions.filter(t=>t.type==="income"&&t.date>=startOfMonth()).reduce((s,t)=>s+t.amount,0);
-  const totalExpense = transactions.filter(t=>t.type==="expense"&&t.date>=startOfMonth()).reduce((s,t)=>s+t.amount,0);
+  const trackedThisMonth = useMemo(
+    () => transactions.filter(t => t.category !== "Penyesuaian Saldo" && t.date >= startOfMonth()),
+    [transactions]
+  );
+  const totalIncome  = trackedThisMonth.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+  const totalExpense = trackedThisMonth.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const budgetLeft   = monthlyBudget - totalExpense;
   const budgetPct    = Math.min(100,Math.round(totalExpense/Math.max(monthlyBudget,1)*100));
   const show         = v => hidden ? mask(v) : fmt(v);
@@ -834,6 +1176,10 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
 
   // FIX: Prediksi tidak berasumsi income 0. Gunakan income bulan lalu / bulan ini.
   const dLeft = daysLeftMonth();
+  // daily budget tracker — declared after dLeft
+  const todayExpense = useMemo(()=>transactions.filter(t=>t.type==="expense"&&t.date===todayStr()&&t.category!=="Penyesuaian Saldo").reduce((s,t)=>s+t.amount,0),[transactions]);
+  const dailyLimit   = dLeft>0?Math.floor(budgetLeft/Math.max(1,dLeft)):0;
+  const todayRemain  = dailyLimit - todayExpense;
   const daysPassed = Math.max(1, new Date().getDate());
   const avgDailyExp = totalExpense / daysPassed;
   const estMonthlyExp = avgDailyExp * new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
@@ -894,7 +1240,7 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
           <Card style={{height:"100%", marginBottom:0}}>
             <Row style={{marginBottom:12}}>
               <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Monthly Budget</p>
-              <button type="button" onClick={()=>setShowBudgetModal(true)} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
+              <button type="button" onClick={openBudget} style={{background:"none",border:"none",color:G,fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
             </Row>
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               <div style={{position:"relative",width:64,height:64,flexShrink:0}}>
@@ -907,7 +1253,12 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
               <div style={{flex:1}}>
                 <Row style={{marginBottom:4}}><span style={{fontSize:12,color:"#9ca3af"}}>Terpakai</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(totalExpense)}</span></Row>
                 <Row style={{marginBottom:8}}><span style={{fontSize:12,color:"#9ca3af"}}>Limit</span><span style={{fontSize:12,fontWeight:700,color:"#111"}}>{show(monthlyBudget)}</span></Row>
-                <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"⚠️ Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/Math.max(1,dLeft)))) : fmt(Math.max(0,Math.floor(budgetLeft/Math.max(1,dLeft))))} / hari`}</p>
+                <p style={{margin:0,fontSize:11,fontWeight:600,color:budgetLeft<=0?"#ef4444":G}}>{budgetLeft<=0?"Budget habis!":`${hidden?mask(Math.max(0,Math.floor(budgetLeft/Math.max(1,dLeft)))) : fmt(Math.max(0,Math.floor(budgetLeft/Math.max(1,dLeft))))} / hari`}</p>
+                <div style={{marginTop:8,padding:"8px 10px",background:todayRemain<0?"#fef2f2":GL,borderRadius:10,border:`1px solid ${todayRemain<0?"#fecaca":GM}`}}>
+                  <p style={{margin:0,fontSize:9,fontWeight:800,color:todayRemain<0?"#ef4444":G,letterSpacing:.5}}>SISA HARI INI</p>
+                  <p style={{margin:"2px 0 0",fontSize:14,fontWeight:900,color:todayRemain<0?"#ef4444":G}}>{hidden?mask(Math.abs(todayRemain)):(todayRemain<0?"Lewat batas":"")}{!hidden&&todayRemain>=0?fmt(todayRemain):""}</p>
+                  {!hidden&&<p style={{margin:"1px 0 0",fontSize:9,color:"#9ca3af"}}>Sudah keluar: {fmt(todayExpense)}</p>}
+                </div>
               </div>
             </div>
           </Card>
@@ -915,7 +1266,7 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         
         {/* Predictor Card */}
         <div style={{minWidth:"85%", scrollSnapAlign:"start"}}>
-           <Card style={{height:"100%", marginBottom:0, background:"linear-gradient(135deg,#1e1b4b,#312e81)"}}>
+           <Card style={{height:"100%", marginBottom:0, background:"linear-gradient(135deg,#0f2027,#1a3a4a)"}}>
              <Row style={{marginBottom:8}}>
                 <p style={{margin:0,fontSize:14,fontWeight:800,color:"#fff"}}>Prediksi Keuangan</p>
                 <TrendingUp size={16} color="#818cf8"/>
@@ -929,8 +1280,8 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
                <div style={{background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px"}}>
                   <p style={{color:"rgba(255,255,255,0.6)",fontSize:9,fontWeight:700,margin:"0 0 4px",letterSpacing:.5}}>ASET HABIS PERKIRAAN</p>
                   {monthlyNet >= 0 
-                    ? <p style={{color:"#86efac",fontSize:13,fontWeight:700,margin:"0"}}>Surplus / Aman 🎉</p>
-                    : <><p style={{color:"#fca5a5",fontSize:13,fontWeight:800,margin:"0"}}>{brokeDateStr}</p><p style={{color:"rgba(255,255,255,0.5)",fontSize:10,margin:"2px 0 0"}}>{estZeroDaysStr}</p></>
+                    ? <p style={{color:"#86efac",fontSize:13,fontWeight:700,margin:"0"}}>Surplus / Aman</p>
+                    : <><p style={{color:"#fff",fontSize:13,fontWeight:800,margin:"0"}}>{brokeDateStr}</p><p style={{color:"rgba(255,255,255,0.65)",fontSize:10,margin:"2px 0 0"}}>{estZeroDaysStr}</p></>
                   }
                </div>
              </div>
@@ -971,7 +1322,7 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
           );
         })}
       </Card>
-      {showBudgetModal&&<BudgetModal totalBalance={totalBalance} currentBudget={monthlyBudget} savedPct={savedPct} onApply={(v,pct)=>{setMonthlyBudget(v);setSavedPct(pct);setShowBudgetModal(false);}} onClose={()=>setShowBudgetModal(false)}/>}
+      {showBudgetModal&&<BudgetModal totalBalance={totalBalance} currentBudget={monthlyBudget} savedPct={savedPct} onApply={(v,pct)=>{setMonthlyBudget(v);setSavedPct(pct);closeBudget();}} onClose={closeBudget}/>}
     </div>
   );
 }
@@ -985,7 +1336,7 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
   const [search,setSearch]= useState("");
   const searchRef=useRef();
 
-  useEffect(()=>{ if(initialTypeFilter){setTypeF(initialTypeFilter);onFilterConsumed?.();} },[initialTypeFilter]);
+  useEffect(()=>{ if(initialTypeFilter){setTypeF(initialTypeFilter);onFilterConsumed?.();} },[initialTypeFilter, onFilterConsumed]);
   useEffect(()=>{ if(searchOpen&&searchRef.current)searchRef.current.focus(); },[searchOpen]);
 
   const filtered=useMemo(()=>{
@@ -1006,8 +1357,8 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
     return arr;
   },[transactions,typeF,dateF,from,to,search,accounts]);
 
-  const totalInc=filtered.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
-  const totalExp=filtered.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+  const totalInc=filtered.filter(t=>t.type==="income" && t.category!=="Penyesuaian Saldo").reduce((s,t)=>s+t.amount,0);
+  const totalExp=filtered.filter(t=>t.type==="expense" && t.category!=="Penyesuaian Saldo").reduce((s,t)=>s+t.amount,0);
   const net=totalInc-totalExp;
   const grouped=useMemo(()=>{ const m=new Map();filtered.forEach(t=>{if(!m.has(t.date))m.set(t.date,[]);m.get(t.date).push(t);}); return Array.from(m.entries()).sort((a,b)=>new Date(b[0])-new Date(a[0])); },[filtered]);
 
@@ -1061,26 +1412,117 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
   );
 }
 
+
+// ─── CURRENCY CONVERTER MODAL ─────────────────────────────────────────────────
+const CURRENCIES = [
+  {code:"USD",name:"Dolar AS",symbol:"$",flag:"🇺🇸"},
+  {code:"EUR",name:"Euro",symbol:"€",flag:"🇪🇺"},
+  {code:"GBP",name:"Pound Sterling",symbol:"£",flag:"🇬🇧"},
+  {code:"JPY",name:"Yen Jepang",symbol:"¥",flag:"🇯🇵"},
+  {code:"SGD",name:"Dolar Singapura",symbol:"S$",flag:"🇸🇬"},
+  {code:"MYR",name:"Ringgit Malaysia",symbol:"RM",flag:"🇲🇾"},
+  {code:"AUD",name:"Dolar Australia",symbol:"A$",flag:"🇦🇺"},
+  {code:"SAR",name:"Riyal Arab Saudi",symbol:"﷼",flag:"🇸🇦"},
+];
+
+function CurrencyModal({ totalBalance, onClose }) {
+  const [selected, setSelected] = useState("USD");
+  const [rates, setRates] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [lastUpdate, setLastUpdate] = useState("");
+
+  const fetchRates = async () => {
+    setLoading(true); setErr("");
+    try {
+      const res = await fetch("https://api.exchangerate-api.com/v4/latest/IDR");
+      if(!res.ok) throw new Error("Gagal ambil kurs");
+      const data = await res.json();
+      setRates(data.rates||{});
+      setLastUpdate(new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}));
+    } catch(e) {
+      // Fallback approximate rates
+      setRates({USD:0.000063,EUR:0.000058,GBP:0.000050,JPY:0.0094,SGD:0.000085,MYR:0.00030,AUD:0.000098,SAR:0.000237});
+      setErr("Menggunakan kurs estimasi (offline)");
+    } finally { setLoading(false); }
+  };
+
+  useEffect(()=>{ fetchRates(); },[]);
+
+  const sel = CURRENCIES.find(c=>c.code===selected)||CURRENCIES[0];
+  const rate = rates[selected]||0;
+  const converted = rate ? (totalBalance * rate) : null;
+
+  return (
+    <BottomSheet onClose={onClose} title="Konversi Kurs">
+      <Card style={{background:`linear-gradient(135deg,${G},${G2})`,marginBottom:12}}>
+        <p style={{color:"rgba(255,255,255,0.8)",fontSize:11,margin:"0 0 2px"}}>Total Saldo (IDR)</p>
+        <p style={{color:"#fff",fontSize:22,fontWeight:900,margin:0}}>{fmt(totalBalance)}</p>
+      </Card>
+
+      <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:.6}}>PILIH MATA UANG</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
+        {CURRENCIES.map(cur=>(
+          <button type="button" key={cur.code} onClick={()=>setSelected(cur.code)}
+            style={{padding:"8px 4px",background:selected===cur.code?GL:"#f8fafc",border:`1.5px solid ${selected===cur.code?G:"#f1f5f9"}`,borderRadius:12,cursor:"pointer",textAlign:"center"}}>
+            <div style={{fontSize:20,marginBottom:2}}>{cur.flag}</div>
+            <p style={{margin:0,fontSize:11,fontWeight:700,color:selected===cur.code?G:"#374151"}}>{cur.code}</p>
+          </button>
+        ))}
+      </div>
+
+      {loading?(
+        <div style={{textAlign:"center",padding:"20px 0"}}>
+          <div style={{fontSize:24,animation:"spin 1s linear infinite",display:"inline-block"}}>⚙️</div>
+          <p style={{color:G,fontSize:12,marginTop:8}}>Mengambil kurs...</p>
+        </div>
+      ):(
+        <Card style={{background:"#111827",marginBottom:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+            <div>
+              <p style={{color:"rgba(255,255,255,0.65)",fontSize:10,margin:"0 0 4px"}}>{sel.flag} {sel.name}</p>
+              <p style={{color:"#fff",fontSize:28,fontWeight:900,margin:0}}>
+                {converted!=null?(sel.symbol+(converted<1000?converted.toFixed(2):converted>=1e6?(converted/1e6).toFixed(2)+"M":converted>=1000?(converted/1000).toFixed(1)+"K":converted.toFixed(2))):"—"}
+              </p>
+            </div>
+            <button type="button" onClick={fetchRates} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:9,padding:"6px 10px",color:"#fff",fontSize:11,cursor:"pointer"}}>↻ Refresh</button>
+          </div>
+          <p style={{color:"rgba(255,255,255,0.45)",fontSize:10,margin:"4px 0 0"}}>
+            1 IDR = {rate?(rate < 0.001?rate.toFixed(6):rate < 1?rate.toFixed(4):rate.toFixed(2)):"-"} {selected}
+            {lastUpdate&&` · ${lastUpdate}`}
+          </p>
+          {err&&<p style={{color:"#fca5a5",fontSize:10,marginTop:4}}>{err}</p>}
+        </Card>
+      )}
+    </BottomSheet>
+  );
+}
+
 // ─── ACCOUNTS SCREEN ──────────────────────────────────────────────────────────
-function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, setSelectedAcc }) {
+function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, setSelectedAcc, registerLocalModal, unregisterLocalModal, onOpenTransfer }) {
   const [editAcc,   setEditAcc]   = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
   const [delConfirm,setDelConfirm]= useState(null);
-  const [animatingId, setAnimatingId] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const [showCurrency, setShowCurrency] = useState(false);
+  const holdTimerRef = useRef(null);
+  const didLongPressRef = useRef(false);
+  const openEditAcc  = (data) => { setEditAcc(data);  registerLocalModal?.(()=>setEditAcc(null)); };
+  const closeEditAcc = () => { setEditAcc(null); unregisterLocalModal?.(); };
+  const openAddAcc   = () => { setShowAdd(true);  registerLocalModal?.(()=>setShowAdd(false)); };
+  const closeAddAcc  = () => { setShowAdd(false); unregisterLocalModal?.(); };
+  const openDelConfirm  = (data) => { setDelConfirm(data);  registerLocalModal?.(()=>setDelConfirm(null)); };
+  const closeDelConfirm = () => { setDelConfirm(null); unregisterLocalModal?.(); };
   const total = accounts.reduce((s,a)=>s+a.balance,0);
 
-  const moveUp = i => {
-    if(i===0) return;
-    setAnimatingId(accounts[i].id);
-    const a=[...accounts]; [a[i-1],a[i]]=[a[i],a[i-1]]; setAccounts(a);
-    setTimeout(()=>setAnimatingId(null),350);
-  };
-  const moveDown = i => {
-    if(i===accounts.length-1) return;
-    setAnimatingId(accounts[i].id);
-    const a=[...accounts]; [a[i],a[i+1]]=[a[i+1],a[i]]; setAccounts(a);
-    setTimeout(()=>setAnimatingId(null),350);
-  };
+  const moveItem = useCallback((arr, from, to) => {
+    if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr;
+    const next = [...arr];
+    const [it] = next.splice(from, 1);
+    next.splice(to, 0, it);
+    return next;
+  }, []);
 
   const handleSaveAcc = (updated, adjustment) => {
     setAccounts(p=>p.map(a=>a.id===updated.id ? {...a,...updated,balance:adjustment!=null?(a.balance+adjustment):a.balance} : a));
@@ -1088,62 +1530,373 @@ function AccountsScreen({ accounts, setAccounts, transactions, setTransactions, 
       const adjTxn = { id:generateId(), type:adjustment>0?"income":"expense", amount:Math.abs(adjustment), category:"Penyesuaian Saldo", note:`Penyesuaian saldo — ${updated.name}`, date:todayStr(), time:nowTime(), accountId:updated.id, detected:null, attachmentMeta:[] };
       setTransactions(p=>[adjTxn,...p]);
     }
-    setEditAcc(null);
+    closeEditAcc();
+  };
+  
+  const stopHoldTimer = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
   };
 
   return (
     <div style={{padding:"0 16px 16px"}}>
       <div style={{background:`linear-gradient(145deg,${G},${G2})`,borderRadius:22,padding:"20px 22px",marginBottom:14}}>
-        <p style={{color:"rgba(255,255,255,0.75)",fontSize:12,margin:"0 0 4px"}}>Total Semua Akun</p>
-        <p style={{color:"#fff",fontSize:26,fontWeight:800,margin:0}}>{fmt(total)}</p>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <p style={{color:"rgba(255,255,255,0.75)",fontSize:12,margin:"0 0 4px"}}>Total Semua Akun</p>
+            <p style={{color:"#fff",fontSize:26,fontWeight:800,margin:0}}>{fmt(total)}</p>
+          </div>
+          <button type="button" onClick={()=>setShowCurrency(true)} style={{background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.35)",borderRadius:12,padding:"8px 12px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            <Coins size={15} strokeWidth={1.8}/> Kurs
+          </button>
+        </div>
       </div>
       <Row style={{marginBottom:10}}>
         <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Daftar Akun</p>
-        <button type="button" onClick={()=>setShowAdd(true)} style={{background:GL,border:"none",borderRadius:10,padding:"7px 14px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Plus size={14}/> Tambah</button>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button type="button" onClick={()=>setEditMode(p=>!p)} style={{background:"#f1f5f9",border:"none",borderRadius:10,padding:"7px 12px",color:"#374151",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            <Pencil size={14} strokeWidth={1.8}/> {editMode ? "Selesai" : "Edit"}
+          </button>
+          <button type="button" onClick={onOpenTransfer} disabled={accounts.length<2} style={{background:accounts.length<2?"#e5e7eb":GL,border:"none",borderRadius:10,padding:"7px 12px",color:accounts.length<2?"#9ca3af":G,fontSize:12,fontWeight:700,cursor:accounts.length<2?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6}}>
+            <ArrowUpRight size={14} strokeWidth={1.8}/> Transfer
+          </button>
+          <button type="button" onClick={openAddAcc} style={{background:GL,border:"none",borderRadius:10,padding:"7px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><Plus size={14}/> Tambah</button>
+        </div>
       </Row>
       {accounts.length===0&&<Card style={{textAlign:"center",padding:"24px"}}><p style={{color:"#9ca3af",fontSize:13}}>Belum ada akun. Tambah sekarang!</p></Card>}
       
-      <div style={{display:"flex", flexDirection:"column", gap:10}}>
+      <style>{`
+        @keyframes jiggle { 0%{transform:rotate(-1.5deg)} 100%{transform:rotate(1.5deg)} }
+      `}</style>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
         {accounts.map((acc,i)=>{
           const T=ACC_TYPES.find(t=>t.type===acc.type);
-          const isAnim = animatingId===acc.id;
           return (
-            <div key={acc.id} style={{transition:"transform .3s cubic-bezier(0.34,1.56,0.64,1), opacity .2s",transform:isAnim?"scale(1.02)":"scale(1)",opacity:isAnim?0.85:1,marginBottom:10}}>
-              <Card style={{padding:0,overflow:"hidden",marginBottom:0}}>
-                <button type="button" onClick={()=>setSelectedAcc({acc,idx:i})} style={{background:getAccGrad(acc,i),padding:"14px 16px",display:"flex",alignItems:"center",gap:12,width:"100%",border:"none",cursor:"pointer",outline:"none"}}>
-                  <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
-                    {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:28,height:28,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
+            <div
+              key={acc.id}
+              data-acc-id={String(acc.id)}
+              style={{
+                borderRadius:18,
+                overflow:"hidden",
+                background:"#fff",
+                border:"1px solid #eef2f7",
+                boxShadow:"0 2px 12px rgba(0,0,0,0.05)",
+                animation: editMode && draggingId!==String(acc.id) ? "jiggle 0.12s ease-in-out infinite alternate" : "none",
+                transform: "scale(1)",
+                opacity: draggingId===String(acc.id) ? 0 : 1,
+                touchAction: editMode ? "none" : "manipulation",
+              }}
+              onPointerDown={(e)=>{
+                if (editMode) {
+                  setDraggingId(String(acc.id));
+                  try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+                  // create floating ghost
+                  const rect=e.currentTarget.getBoundingClientRect();
+                  const ghost=document.createElement("div");
+                  ghost.id="drag-ghost";
+                  ghost.style.cssText=`position:fixed;pointer-events:none;z-index:999;width:${rect.width}px;height:${rect.height}px;left:${e.clientX}px;top:${e.clientY}px;transform:translate(-50%,-50%) scale(1.06) rotate(3deg);border-radius:18px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.3);opacity:0.92;transition:transform 0.05s`;
+                  ghost.innerHTML=e.currentTarget.outerHTML;
+                  document.body.appendChild(ghost);
+                  return;
+                }
+                didLongPressRef.current = false;
+                stopHoldTimer();
+                holdTimerRef.current = setTimeout(()=>{
+                  didLongPressRef.current = true;
+                  setEditMode(true);
+                  setDraggingId(String(acc.id));
+                }, 320);
+              }}
+              onPointerMove={(e)=>{
+                if (!editMode || !draggingId) return;
+                e.preventDefault();
+                // smooth floating: update ghost position
+                const ghost = document.getElementById("drag-ghost");
+                if(ghost){ghost.style.left=e.clientX+"px";ghost.style.top=e.clientY+"px";}
+                const el = document.elementFromPoint(e.clientX, e.clientY);
+                const target = el?.closest?.("[data-acc-id]");
+                const targetId = target?.getAttribute?.("data-acc-id");
+                if (!targetId || targetId === draggingId) return;
+                const from = accounts.findIndex(a=>String(a.id)===String(draggingId));
+                const to   = accounts.findIndex(a=>String(a.id)===String(targetId));
+                if (from === -1 || to === -1) return;
+                setAccounts(prev => moveItem(prev, from, to));
+              }}
+              onPointerUp={()=>{
+                stopHoldTimer();
+                if (editMode) { setDraggingId(null); document.getElementById("drag-ghost")?.remove(); }
+              }}
+              onPointerCancel={()=>{
+                stopHoldTimer();
+                if (editMode) { setDraggingId(null); document.getElementById("drag-ghost")?.remove(); }
+              }}
+              onClick={()=>{
+                stopHoldTimer();
+                if (didLongPressRef.current) { didLongPressRef.current = false; return; }
+                if (editMode) return;
+                setSelectedAcc({acc, idx:i});
+              }}
+            >
+              <div style={{background:getAccGrad(acc,i),padding:"14px 14px 12px",position:"relative"}}>
+                <div style={{position:"absolute",top:-18,right:-18,width:60,height:60,borderRadius:"50%",background:"rgba(255,255,255,0.10)"}}/>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+                    <div style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.22)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",flexShrink:0}}>
+                      {acc.iconImg?<img src={acc.iconImg} alt="" style={{width:26,height:26,borderRadius:8,objectFit:"cover"}}/>:T&&<T.Icon s={20}/>}
+                    </div>
+                    <div style={{minWidth:0}}>
+                      <p style={{margin:0,fontSize:13,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{acc.name}</p>
+                      <p style={{margin:"2px 0 0",fontSize:10,color:"rgba(255,255,255,0.75)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{acc.last4?`•••• ${acc.last4}`:T?.label}</p>
+                    </div>
                   </div>
-                  <div style={{flex:1,textAlign:"left"}}>
-                    <p style={{margin:0,fontSize:14,fontWeight:700,color:"#fff"}}>{acc.name}</p>
-                    <p style={{margin:"2px 0 0",fontSize:11,color:"rgba(255,255,255,0.7)"}}>{acc.last4?`•••• ${acc.last4}`:T?.label}</p>
-                  </div>
-                  <p style={{margin:0,fontSize:15,fontWeight:800,color:"#fff"}}>{fmtShort(acc.balance)}</p>
-                </button>
-                <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
-                  <button type="button" onClick={()=>moveUp(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowUp size={14}/></button>
-                  <button type="button" onClick={()=>moveDown(i)} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:"#9ca3af",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowDown size={14}/></button>
-                  <button type="button" onClick={()=>setEditAcc({acc,idx:i})} style={{flex:1,padding:"10px",background:"#fff",border:"none",borderRight:"1px solid #f1f5f9",color:G,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600}}><Pencil size={13}/> Edit</button>
-                  <button type="button" onClick={()=>setDelConfirm({acc,txnCount:transactions.filter(t=>String(t.accountId)===String(acc.id)).length})} style={{flex:1,padding:"10px",background:"#fff",border:"none",color:"#ef4444",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:600,borderRadius:"0 0 18px 0"}}><Trash2 size={13}/> Hapus</button>
                 </div>
-              </Card>
+                <p style={{margin:"10px 0 0",fontSize:16,fontWeight:900,color:"#fff",letterSpacing:-0.2}}>{fmtShort(acc.balance)}</p>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,borderTop:"1px solid #f1f5f9"}}>
+                <button type="button" onClick={(e)=>{e.stopPropagation();openEditAcc({acc,idx:i});}} style={{padding:"10px 0",background:"#fff",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:G,fontWeight:700,fontSize:12,borderRight:"1px solid #f1f5f9"}}>
+                  <Pencil size={13}/> Edit
+                </button>
+                <button type="button" onClick={(e)=>{e.stopPropagation();openDelConfirm({acc,txnCount:transactions.filter(t=>String(t.accountId)===String(acc.id)).length});}} style={{padding:"10px 0",background:"#fff",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:"#ef4444",fontWeight:700,fontSize:12}}>
+                  <Trash2 size={13}/> Hapus
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
-      {editAcc&&<AccountModal initial={editAcc.acc} onClose={()=>setEditAcc(null)} isNew={false} onSave={handleSaveAcc}/>}
-      {showAdd&&<AccountModal isNew onClose={()=>setShowAdd(false)} onSave={(a,_)=>{setAccounts(p=>[...p,{...a,id:generateId(),balance:a.balance||0}]);setShowAdd(false);}}/>}
-      {delConfirm&&<ConfirmDialog title="Hapus Akun?" sub={`Akun "${delConfirm.acc.name}" dan ${delConfirm.txnCount} transaksi terkait akan dihapus permanen.`} onConfirm={()=>{setAccounts(p=>p.filter(a=>a.id!==delConfirm.acc.id));setTransactions(p=>p.filter(t=>String(t.accountId)!==String(delConfirm.acc.id)));setDelConfirm(null);}} onCancel={()=>setDelConfirm(null)}/>}
+      {editAcc&&<AccountModal initial={editAcc.acc} onClose={closeEditAcc} isNew={false} onSave={handleSaveAcc}/>}
+      {showAdd&&<AccountModal isNew onClose={closeAddAcc} onSave={(a,_)=>{setAccounts(p=>[...p,{...a,id:generateId(),balance:a.balance||0}]);closeAddAcc();}}/>}
+      {delConfirm&&<ConfirmDialog title="Hapus Akun?" sub={`Akun "${delConfirm.acc.name}" dan ${delConfirm.txnCount} transaksi terkait akan dihapus permanen.`} onConfirm={()=>{setAccounts(p=>p.filter(a=>a.id!==delConfirm.acc.id));setTransactions(p=>p.filter(t=>String(t.accountId)!==String(delConfirm.acc.id)));closeDelConfirm();}} onCancel={closeDelConfirm}/>}
+      {showCurrency&&<CurrencyModal totalBalance={total} onClose={()=>setShowCurrency(false)}/>}
     </div>
+  );
+}
+
+
+// ─── PIE CHART + CATEGORY LIST (interactive cross-highlight) ─────────────────
+function PieCatCard({ pieData, totalExp }) {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const activeName = activeIdx != null ? pieData[activeIdx]?.name : null;
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div style={{background:"#fff",border:"1px solid #f1f5f9",borderRadius:14,padding:"10px 12px",boxShadow:"0 6px 20px rgba(0,0,0,0.12)",display:"flex",alignItems:"center",gap:10,minWidth:140}}>
+        <div style={{width:32,height:32,borderRadius:9,background:CAT_BG[d.name]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",color:CAT_COLORS[d.name]||"#9ca3af",flexShrink:0}}>{CAT_ICON(d.name,15)}</div>
+        <div>
+          <p style={{margin:0,fontSize:11,fontWeight:700,color:"#111"}}>{d.name}</p>
+          <p style={{margin:"2px 0 0",fontSize:13,fontWeight:800,color:CAT_COLORS[d.name]||"#9ca3af"}}>{fmt(d.value)}</p>
+          <p style={{margin:0,fontSize:10,color:"#9ca3af"}}>{d.pct}%</p>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card>
+      <p style={{margin:"0 0 10px",fontSize:14,fontWeight:800,color:"#111"}}>Pengeluaran per Kategori</p>
+      <div style={{position:"relative",userSelect:"none",WebkitUserSelect:"none"}}>
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart style={{outline:"none"}}>
+            <Pie
+              data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={55} paddingAngle={2}
+              dataKey="value" style={{outline:"none"}} stroke="none"
+              activeIndex={activeIdx}
+              activeShape={(props)=>{
+                const {cx,cy,innerRadius,outerRadius,startAngle,endAngle,fill}=props;
+                return(
+                  <g>
+                    <path d={`M${cx},${cy}m0,0`} fill="none"/>
+                    <path d={require("recharts").default?.Sector?"":`M${cx},${cy}`} fill={fill} opacity={1}/>
+                    <g>
+                      <path style={{filter:"drop-shadow(0 4px 8px rgba(0,0,0,0.2))"}}/>
+                    </g>
+                  </g>
+                );
+              }}
+              onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+              onMouseLeave={()=>setActiveIdx(null)}
+              onClick={(_,idx)=>setActiveIdx(ai=>ai===idx?null:idx)}
+            >
+              {pieData.map((e,i)=>(
+                <Cell key={i} fill={e.color} style={{outline:"none",cursor:"pointer"}}
+                  opacity={activeIdx==null||activeIdx===i?1:0.35}
+                  transform={activeIdx===i?"scale(1.06)":"scale(1)"}
+                  style={{outline:"none",cursor:"pointer",transition:"opacity .2s, transform .2s",transformOrigin:"center"}}
+                />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip/>}/>
+          </PieChart>
+        </ResponsiveContainer>
+        <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
+          {activeName?(
+            <>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:3,color:CAT_COLORS[activeName]||"#9ca3af"}}>{CAT_ICON(activeName,14)}</div>
+              <p style={{margin:0,fontSize:9,color:"#9ca3af",maxWidth:60,textAlign:"center",lineHeight:1.2}}>{activeName}</p>
+            </>
+          ):(
+            <>
+              <p style={{margin:0,fontSize:10,color:"#9ca3af"}}>Total</p>
+              <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>{fmtShort(totalExp)}</p>
+            </>
+          )}
+        </div>
+      </div>
+      <div style={{marginTop:8}}>
+        {pieData.slice(0,6).map((p,i)=>{
+          const isActive = activeName===p.name;
+          const isDimmed = activeName&&!isActive;
+          return (
+            <div key={i} onClick={()=>setActiveIdx(ai=>pieData[ai]?.name===p.name?null:i)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<Math.min(pieData.length,6)-1?"1px solid #f8fafc":"none",cursor:"pointer",opacity:isDimmed?0.35:1,transition:"opacity .2s",borderRadius:10,background:isActive?CAT_BG[p.name]||"#f8fafc":"transparent",paddingLeft:isActive?8:0,paddingRight:isActive?8:0}}>
+              <div style={{width:34,height:34,borderRadius:10,background:CAT_BG[p.name]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",color:CAT_COLORS[p.name]||"#9ca3af",flexShrink:0,transform:isActive?"scale(1.1)":"scale(1)",transition:"transform .2s"}}>{CAT_ICON(p.name,15)}</div>
+              <div style={{flex:1}}>
+                <p style={{margin:0,fontSize:12,fontWeight:isActive?800:700,color:"#111"}}>{p.name}</p>
+                <p style={{margin:"1px 0 0",fontSize:10,color:"#9ca3af"}}>{p.pct}%</p>
+              </div>
+              <p style={{margin:0,fontSize:12,fontWeight:isActive?800:700,color:isActive?CAT_COLORS[p.name]||G:"#111"}}>{fmtShort(p.value)}</p>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
 // ─── CHARTS SCREEN ────────────────────────────────────────────────────────────
 function ChartsScreen({ transactions }) {
-  const totalInc=transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
-  const totalExp=transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
-  const pieData=useMemo(()=>{const m={};transactions.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value,color:CAT_COLORS[name]||"#9ca3af",pct:totalExp>0?Math.round(value/totalExp*100):0}));},[transactions,totalExp]);
-  const barData=useMemo(()=>{const w={"Mg 1":{income:0,expense:0},"Mg 2":{income:0,expense:0},"Mg 3":{income:0,expense:0},"Mg 4":{income:0,expense:0}};transactions.forEach(t=>{const d=new Date(t.date).getDate();const k=d<=7?"Mg 1":d<=14?"Mg 2":d<=21?"Mg 3":"Mg 4";w[k][t.type]+=t.amount;});return Object.entries(w).map(([name,v])=>({name,...v}));},[transactions]);
+  const trackedTxns = useMemo(
+    () => transactions.filter(t => t.category !== "Penyesuaian Saldo"),
+    [transactions]
+  );
+  const totalInc = trackedTxns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+  const totalExp = trackedTxns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+  const pieData = useMemo(()=>{
+    const m={};
+    trackedTxns.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({
+      name,
+      value,
+      color:CAT_COLORS[name]||"#9ca3af",
+      pct:totalExp>0?Math.round(value/totalExp*100):0
+    }));
+  },[trackedTxns,totalExp]);
+  const barData=useMemo(()=>{const w={"Mg 1":{income:0,expense:0},"Mg 2":{income:0,expense:0},"Mg 3":{income:0,expense:0},"Mg 4":{income:0,expense:0}};const thisMonth=startOfMonth();transactions.filter(t=>t.date>=thisMonth).forEach(t=>{const d=new Date(t.date).getDate();const k=d<=7?"Mg 1":d<=14?"Mg 2":d<=21?"Mg 3":"Mg 4";w[k][t.type]+=t.amount;});return Object.entries(w).map(([name,v])=>({name,...v}));},[transactions]);
+  const userJob = lsGet("dk_job","");
+  const userAge = lsGet("dk_age",0);
+  const userEdu = lsGet("dk_edu","");
+
+  const salaryInsight = useMemo(() => {
+    if (!trackedTxns.length) return null;
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    const start = getLocalISOString(d);
+    const lastMonthExpenses = trackedTxns
+      .filter(t => t.type === "expense" && t.date >= start)
+      .reduce((s, t) => s + t.amount, 0);
+    if (!lastMonthExpenses) return null;
+
+    const livingCost = lastMonthExpenses;
+    const idealSalary = Math.round(livingCost / 0.7);
+
+    let jobLevel = "Entry level / Part-time";
+    let freeJobs = "Barista, kasir ritel, customer service junior, admin entry.";
+    if (idealSalary >= 3000000 && idealSalary < 6000000) {
+      jobLevel = "Fresh graduate / Junior";
+      freeJobs = "Admin kantor, customer service, junior designer, staf operasional.";
+    } else if (idealSalary >= 6000000 && idealSalary < 10000000) {
+      jobLevel = "Mid-level profesional";
+      freeJobs = "Account executive, software developer, analis data, creative specialist.";
+    } else if (idealSalary >= 10000000 && idealSalary < 20000000) {
+      jobLevel = "Senior profesional";
+      freeJobs = "Senior engineer, product designer, project manager, konsultan.";
+    } else if (idealSalary >= 20000000) {
+      jobLevel = "Lead / Manajer";
+      freeJobs = "Engineering lead, product manager, direktur, konsultan spesialis.";
+    }
+
+    // Career path based on current job
+    let careerPath = "";
+    const job = userJob.toLowerCase();
+    if(job.includes("pelajar")||job.includes("mahasiswa")) {
+      careerPath = idealSalary < 5000000
+        ? "Mulai part-time/freelance di bidang minatmu sambil kuliah. Bangun portofolio sejak dini."
+        : "Selesaikan kuliah, aktif magang & freelance. Target kerja full-time di perusahaan mid–senior dalam 1–2 tahun.";
+    } else if(job.includes("guru")||job.includes("dosen")) {
+      careerPath = idealSalary < 8000000
+        ? "Ambil sertifikasi guru/dosen untuk tunjangan lebih besar. Pertimbangkan bimbel atau kelas online."
+        : "Naik ke level kepala sekolah, lektor, atau buka lembaga pendidikan sendiri.";
+    } else if(job.includes("pns")||job.includes("asn")) {
+      careerPath = "Kejar naik golongan/eselon. Manfaatkan tunjangan kinerja & sertifikasi jabatan fungsional.";
+    } else if(job.includes("karyawan")||job.includes("swasta")) {
+      careerPath = idealSalary < 10000000
+        ? "Tingkatkan skill teknis & soft skill. Negosiasi kenaikan gaji tahunan atau pindah ke perusahaan lebih besar."
+        : "Incaran posisi manajerial atau spesialis senior. Pertimbangkan MBA atau sertifikasi profesional.";
+    } else if(job.includes("wiraswasta")||job.includes("pengusaha")) {
+      careerPath = "Fokus scale bisnis: perluas pasar, rekrut tim, dan eksplorasi pendanaan investor jika perlu.";
+    } else if(job.includes("freelancer")) {
+      careerPath = idealSalary < 8000000
+        ? "Naikkan rate per proyek, bangun personal brand, dan pertimbangkan niche khusus untuk bayaran premium."
+        : "Ekspansi ke agensi kecil atau produk digital pasif income (template, kursus, SaaS).";
+    } else if(job.includes("dokter")||job.includes("medis")) {
+      careerPath = "Spesialisasi atau sub-spesialisasi sangat signifikan meningkatkan income. Pertimbangkan klinik mandiri.";
+    } else if(job.includes("engineer")||job.includes("programmer")) {
+      careerPath = idealSalary < 15000000
+        ? "Dalami satu stack/domain (AI, cloud, fintech). Remote job internasional bisa 3–5x gaji lokal."
+        : "Lead engineer, staff engineer, atau tech lead. Pertimbangkan startup equity atau freelance internasional.";
+    } else {
+      careerPath = `Dengan gaji ideal ${fmtShort(idealSalary)}/bln, cari peluang naik jabatan, sertifikasi, atau pindah ke industri dengan rata-rata gaji lebih tinggi.`;
+    }
+
+    return { livingCost, idealSalary, jobLevel, freeJobs, careerPath };
+  }, [trackedTxns, userJob, userAge, userEdu]);
+
+  const lifestyle = useMemo(() => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    const start = getLocalISOString(d);
+    const last30 = trackedTxns.filter(t => t.type === "expense" && t.date >= start);
+    const total = last30.reduce((s,t)=>s+t.amount,0);
+    if (!total) return null;
+
+    const byCat = {};
+    for (const t of last30) byCat[t.category] = (byCat[t.category]||0) + t.amount;
+    const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([cat,amt])=>({cat,amt,pct:Math.round(amt/total*100)}));
+    const topCat = top[0]?.cat || "Lainnya";
+
+    const share = (cats) => cats.reduce((s,c)=>s+(byCat[c]||0),0) / total;
+    const impulsive = Math.round(share(["Belanja Online","Hiburan","Perawatan"]) * 100);
+    const adulting  = Math.round(share(["Tagihan","Tempat Tinggal","Transportasi"]) * 100);
+    const wellness  = Math.round(share(["Kesehatan","Pendidikan"]) * 100);
+
+    let persona = { title:"The Minimalist", desc:"Kamu hemat dan terarah. Pengeluaranmu rapi dan fungsional.", icon:<Shield size={16} strokeWidth={1.8}/> };
+    if (topCat === "Makan & Minum") persona = { title:"The Foodie", desc:"Kebahagiaanmu sering datang dari makan enak. Mantap, tapi tetap jaga limit.", icon:<Coffee size={16} strokeWidth={1.8}/> };
+    else if (topCat === "Belanja Online") persona = { title:"The Online Hunter", desc:"Cepat, praktis, dan sering checkout. Kamu jago cari barang, tapi rawan impulsif.", icon:<ShoppingBag size={16} strokeWidth={1.8}/> };
+    else if (topCat === "Transportasi") persona = { title:"The Road Runner", desc:"Mobilitas tinggi. Kamu punya ritme jalan-jalan yang konsisten.", icon:<Car size={16} strokeWidth={1.8}/> };
+    else if (topCat === "Hiburan") persona = { title:"The Entertainer", desc:"Kamu tahu cara recharge. Pastikan hiburan tetap jadi hadiah, bukan kebiasaan mahal.", icon:<Monitor size={16} strokeWidth={1.8}/> };
+    else if (topCat === "Tagihan") persona = { title:"The Adulting Pro", desc:"Tagihan aman, hidup stabil. Kamu serius dan bertanggung jawab.", icon:<Zap size={16} strokeWidth={1.8}/> };
+    else if (topCat === "Kesehatan") persona = { title:"The Wellness Keeper", desc:"Kamu investasi ke kesehatan. Good choice.", icon:<Heart size={16} strokeWidth={1.8}/> };
+
+    const funFact = impulsive >= 45
+      ? "Mode ‘checkout’ sering aktif. Coba aturan 24 jam sebelum bayar."
+      : adulting >= 45
+        ? "Kamu tipe ‘aman dulu’. Stabil banget—tinggal maksimalkan tabungan."
+        : "Balance kamu lumayan. Tinggal bikin satu kebiasaan kecil biar makin solid.";
+
+    const mission = impulsive >= 45
+      ? "Misi 7 hari: No-checkout challenge (boleh wishlist, jangan bayar)."
+      : adulting >= 45
+        ? "Misi 7 hari: auto-sisihkan 5–10% saat uang masuk."
+        : "Misi 7 hari: catat semua transaksi kecil (di bawah 20rb) biar kebaca bocornya.";
+
+    return { total, top, impulsive, adulting, wellness, persona, funFact, mission };
+  }, [trackedTxns]);
   return (
     <div style={{padding:"0 16px 16px"}}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
@@ -1154,30 +1907,7 @@ function ChartsScreen({ transactions }) {
           </Card>
         ))}
       </div>
-      <Card>
-        <p style={{margin:"0 0 10px",fontSize:14,fontWeight:800,color:"#111"}}>Pengeluaran per Kategori</p>
-        <div style={{position:"relative",userSelect:"none",WebkitUserSelect:"none"}}>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart style={{outline:"none"}} onClick={()=>{}}>
-              <Pie data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={55} paddingAngle={2} dataKey="value" style={{outline:"none"}} stroke="none">{pieData.map((e,i)=><Cell key={i} fill={e.color} style={{outline:"none"}} stroke="none"/>)}</Pie>
-              <Tooltip contentStyle={{background:"#fff",border:"1px solid #f1f5f9",borderRadius:12,fontSize:12,boxShadow:"0 4px 16px rgba(0,0,0,0.08)"}} formatter={v=>[fmt(v),""]}/>
-            </PieChart>
-          </ResponsiveContainer>
-          <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
-            <p style={{margin:0,fontSize:10,color:"#9ca3af"}}>Total</p>
-            <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>{fmtShort(totalExp)}</p>
-          </div>
-        </div>
-        <div style={{marginTop:8}}>
-          {pieData.slice(0,6).map((p,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<Math.min(pieData.length,6)-1?"1px solid #f8fafc":"none"}}>
-              <div style={{width:34,height:34,borderRadius:10,background:CAT_BG[p.name]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",color:CAT_COLORS[p.name]||"#9ca3af",flexShrink:0}}>{CAT_ICON(p.name,15)}</div>
-              <div style={{flex:1}}><p style={{margin:0,fontSize:12,fontWeight:700,color:"#111"}}>{p.name}</p><p style={{margin:"1px 0 0",fontSize:10,color:"#9ca3af"}}>{p.pct}%</p></div>
-              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#111"}}>{fmtShort(p.value)}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <PieCatCard pieData={pieData} totalExp={totalExp}/>
       <Card>
         <p style={{margin:"0 0 12px",fontSize:14,fontWeight:800,color:"#111"}}>Ringkasan Mingguan</p>
         <div style={{WebkitUserSelect:"none",userSelect:"none"}}>
@@ -1195,14 +1925,104 @@ function ChartsScreen({ transactions }) {
           {[{col:G,l:"Pemasukan"},{col:"#fca5a5",l:"Pengeluaran"}].map(x=><div key={x.l} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:3,background:x.col}}/><span style={{fontSize:11,color:"#6b7280"}}>{x.l}</span></div>)}
         </div>
       </Card>
+      {lifestyle && (
+        <Card>
+          <Row style={{marginBottom:10}}>
+            <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Analisis Gaya Hidup</p>
+            <div style={{display:"flex",alignItems:"center",gap:6,background:GL,borderRadius:999,padding:"6px 10px",color:G}}>
+              {lifestyle.persona.icon}
+              <span style={{fontSize:11,fontWeight:800}}>{lifestyle.persona.title}</span>
+            </div>
+          </Row>
+          <p style={{margin:"0 0 10px",fontSize:12,color:"#6b7280",lineHeight:1.5}}>{lifestyle.persona.desc}</p>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+            {[{l:"Impulsif",v:lifestyle.impulsive,col:"#ef4444"},{l:"Adulting",v:lifestyle.adulting,col:G},{l:"Wellness",v:lifestyle.wellness,col:"#0ea5e9"}].map(x=>(
+              <div key={x.l} style={{background:"#f8fafc",border:"1px solid #eef2f7",borderRadius:14,padding:"10px"}}>
+                <p style={{margin:"0 0 6px",fontSize:10,fontWeight:800,color:"#6b7280"}}>{x.l.toUpperCase()}</p>
+                <p style={{margin:0,fontSize:16,fontWeight:900,color:"#111"}}>{x.v}<span style={{fontSize:11,fontWeight:800,color:"#9ca3af"}}>%</span></p>
+                <div style={{height:6,borderRadius:99,background:"#e5e7eb",marginTop:8,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${Math.min(100,Math.max(0,x.v))}%`,background:x.col,borderRadius:99}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{background:"#fff",border:"1px solid #eef2f7",borderRadius:16,padding:"10px 12px",marginBottom:10}}>
+            <p style={{margin:"0 0 6px",fontSize:10,fontWeight:800,color:"#9ca3af",letterSpacing:.6}}>TOP 3 PENGELUARAN (30 HARI)</p>
+            {lifestyle.top.map((t,idx)=>(
+              <div key={t.cat} style={{display:"flex",alignItems:"center",gap:10,padding:idx<lifestyle.top.length-1?"8px 0":"6px 0",borderBottom:idx<lifestyle.top.length-1?"1px solid #f1f5f9":"none"}}>
+                <div style={{width:34,height:34,borderRadius:10,background:CAT_BG[t.cat]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",color:CAT_COLORS[t.cat]||"#9ca3af",flexShrink:0}}>
+                  {CAT_ICON(t.cat,16)}
+                </div>
+                <div style={{flex:1}}>
+                  <p style={{margin:0,fontSize:12,fontWeight:800,color:"#111"}}>{t.cat}</p>
+                  <p style={{margin:"2px 0 0",fontSize:10,color:"#9ca3af"}}>{t.pct}%</p>
+                </div>
+                <p style={{margin:0,fontSize:12,fontWeight:800,color:"#111"}}>{fmtShort(t.amt)}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{background:GL,borderRadius:16,padding:"10px 12px",marginBottom:8}}>
+            <p style={{margin:0,fontSize:10,fontWeight:900,color:G,letterSpacing:.6}}>FUN FACT</p>
+            <p style={{margin:"4px 0 0",fontSize:12,color:"#111",lineHeight:1.5}}>{lifestyle.funFact}</p>
+          </div>
+          <div style={{background:"#111827",borderRadius:16,padding:"10px 12px",color:"#fff"}}>
+            <p style={{margin:0,fontSize:10,fontWeight:900,letterSpacing:.6,opacity:.85}}>MISI 7 HARI</p>
+            <p style={{margin:"4px 0 0",fontSize:12,lineHeight:1.5,opacity:.92}}>{lifestyle.mission}</p>
+          </div>
+        </Card>
+      )}
+
+      {salaryInsight && (
+        <Card>
+          <Row style={{marginBottom:10}}>
+            <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Estimasi Gaji Ideal</p>
+            <div style={{display:"flex",alignItems:"center",gap:6,background:"#f8fafc",border:"1px solid #eef2f7",borderRadius:999,padding:"6px 10px",color:"#111"}}>
+              <Briefcase size={16} strokeWidth={1.8}/>
+              <span style={{fontSize:11,fontWeight:800}}>{salaryInsight.jobLevel}</span>
+            </div>
+          </Row>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div style={{background:GL,borderRadius:14,padding:"10px 12px"}}>
+              <p style={{margin:0,fontSize:10,fontWeight:800,color:G,letterSpacing:.6}}>BIAYA HIDUP (30 HARI)</p>
+              <p style={{margin:"4px 0 0",fontSize:16,fontWeight:900,color:"#111"}}>{fmtShort(salaryInsight.livingCost)}</p>
+            </div>
+            <div style={{background:"#f8fafc",border:"1px solid #eef2f7",borderRadius:14,padding:"10px 12px"}}>
+              <p style={{margin:0,fontSize:10,fontWeight:800,color:"#6b7280",letterSpacing:.6}}>GAJI IDEAL MIN.</p>
+              <p style={{margin:"4px 0 0",fontSize:16,fontWeight:900,color:"#111"}}>{fmtShort(salaryInsight.idealSalary)}</p>
+            </div>
+          </div>
+          {salaryInsight.careerPath&&(
+            <div style={{background:GL,borderRadius:14,padding:"10px 12px",marginBottom:10,border:`1px solid ${GM}`}}>
+              <p style={{margin:"0 0 4px",fontSize:10,fontWeight:800,color:G,letterSpacing:.6}}>JENJANG KARIR — {(lsGet("dk_job","")||"PEKERJAAN KAMU").toUpperCase()}</p>
+              <p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>{salaryInsight.careerPath}</p>
+            </div>
+          )}
+          <div style={{background:"#f8fafc",borderRadius:14,padding:"10px 12px"}}>
+            <p style={{margin:"0 0 4px",fontSize:10,fontWeight:800,color:"#6b7280",letterSpacing:.6}}>REKOMENDASI KARIR BEBAS</p>
+            <p style={{margin:0,fontSize:12,color:"#374151",lineHeight:1.6}}>{salaryInsight.freeJobs}</p>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
-function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, transactions, accounts, pinEnabled, pinHash, setPinEnabled, setPinHash, bioEnabled, setBioEnabled, soundEnabled, setSoundEnabled, setTransactions, setAccounts, setShowImport }) {
+function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, transactions, accounts, pinEnabled, pinHash, setPinEnabled, setPinHash, bioEnabled, setBioEnabled, soundEnabled, setSoundEnabled, setTransactions, setAccounts, setShowImport, registerLocalModal, unregisterLocalModal }) {
+  const { lang, setLang, t } = useLang();
+  const [userAge, setUserAge] = useState(()=>lsGet("dk_age",0));
+  const [userJob, setUserJob] = useState(()=>lsGet("dk_job",""));
+  const [userEdu, setUserEdu] = useState(()=>lsGet("dk_edu",""));
+  const [editProfile, setEditProfile] = useState(false);
   const [showSetPin,  setShowSetPin]  = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const openSetPin  = () => { setShowSetPin(true);  registerLocalModal?.(()=>setShowSetPin(false)); };
+  const closeSetPin = () => { setShowSetPin(false); unregisterLocalModal?.(); };
+  const openConfirm  = () => { setShowConfirm(true);  registerLocalModal?.(()=>setShowConfirm(false)); };
+  const closeConfirm = () => { setShowConfirm(false); unregisterLocalModal?.(); };
   const [editName,    setEditName]    = useState(false);
   const [nameInput,   setNameInput]   = useState(userName);
   const avatarRef = useRef();
@@ -1232,48 +2052,89 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       </Card>
       
       <Card style={{padding:"4px 0",marginBottom:12}}>
-        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>KEAMANAN</p>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px 4px"}}>
+          <p style={{margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>PROFIL SAYA</p>
+          <button type="button" onClick={()=>setEditProfile(p=>!p)} style={{background:GL,border:"none",borderRadius:8,padding:"4px 10px",color:G,fontSize:11,fontWeight:700,cursor:"pointer"}}>{editProfile?"Simpan":"Edit"}</button>
+        </div>
+        {editProfile?(
+          <div style={{padding:"8px 16px 14px",display:"flex",flexDirection:"column",gap:8}}>
+            <div><p style={{margin:"0 0 3px",fontSize:10,color:"#9ca3af",fontWeight:700}}>UMUR</p><input type="number" min="10" max="100" value={userAge||""} onChange={e=>{const v=parseInt(e.target.value)||0;setUserAge(v);lsSet("dk_age",v);}} style={{border:"1px solid #e5e7eb",borderRadius:10,padding:"8px 12px",fontSize:14,fontWeight:600,color:"#111",width:"100%",outline:"none",boxSizing:"border-box"}}/></div>
+            <div><p style={{margin:"0 0 3px",fontSize:10,color:"#9ca3af",fontWeight:700}}>PEKERJAAN</p><select value={userJob} onChange={e=>{setUserJob(e.target.value);lsSet("dk_job",e.target.value);}} style={{border:"1px solid #e5e7eb",borderRadius:10,padding:"8px 12px",fontSize:14,fontWeight:600,color:"#111",width:"100%",outline:"none",boxSizing:"border-box",WebkitAppearance:"none"}}><option value="">Pilih pekerjaan...</option>{JOBS.map(j=><option key={j} value={j}>{j}</option>)}</select></div>
+            <div><p style={{margin:"0 0 3px",fontSize:10,color:"#9ca3af",fontWeight:700}}>PENDIDIKAN TERAKHIR</p><select value={userEdu} onChange={e=>{setUserEdu(e.target.value);lsSet("dk_edu",e.target.value);}} style={{border:"1px solid #e5e7eb",borderRadius:10,padding:"8px 12px",fontSize:14,fontWeight:600,color:"#111",width:"100%",outline:"none",boxSizing:"border-box",WebkitAppearance:"none"}}><option value="">Pilih pendidikan...</option>{EDUS.map(e=><option key={e} value={e}>{e}</option>)}</select></div>
+          </div>
+        ):(
+          <div style={{padding:"8px 16px 14px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {[{l:"Umur",v:userAge?`${userAge} tahun`:"Belum diisi"},{l:"Pekerjaan",v:userJob||"Belum diisi"},{l:"Pendidikan",v:userEdu||"Belum diisi"}].map(x=>(
+              <div key={x.l} style={{background:"#f8fafc",borderRadius:10,padding:"10px 12px"}}>
+                <p style={{margin:"0 0 2px",fontSize:9,fontWeight:700,color:"#9ca3af",letterSpacing:.5}}>{x.l.toUpperCase()}</p>
+                <p style={{margin:0,fontSize:12,fontWeight:600,color:x.v==="Belum diisi"?"#d1d5db":"#111"}}>{x.v}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      <Card style={{padding:"4px 0",marginBottom:12}}>
+        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>{t("Keamanan").toUpperCase()}</p>
         <SRow icon={<Lock size={15} strokeWidth={1.7}/>} title="Kunci PIN" sub={pinEnabled?"Aktif — app terkunci saat keluar background":"Nonaktif"} 
-          right={<Tog on={pinEnabled} onToggle={()=>{ if(pinEnabled){setPinEnabled(false);setBioEnabled(false);}else{setShowSetPin(true);} }}/>}/>
+          right={<Tog on={pinEnabled} onToggle={()=>{ if(pinEnabled){setPinEnabled(false);setBioEnabled(false);}else{openSetPin();} }}/>}/>
         {pinEnabled&&<SRow icon={<Fingerprint size={15} strokeWidth={1.7}/>} title="Biometrik" sub="Gunakan sidik jari / wajah" right={<Tog on={bioEnabled} onToggle={toggleBiometrics}/> }/>}
-        {pinEnabled&&<SRow icon={<Shield size={15} strokeWidth={1.7}/>} title="Ganti PIN" right={<button type="button" onClick={()=>setShowSetPin(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Ubah</button>}/>}
+        {pinEnabled&&<SRow icon={<Shield size={15} strokeWidth={1.7}/>} title="Ganti PIN" right={<button type="button" onClick={openSetPin} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Ubah</button>}/>}
       </Card>
       
       <Card style={{padding:"4px 0",marginBottom:12}}>
-        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>PREFERENSI</p>
+        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>{t("Preferensi").toUpperCase()}</p>
         <SRow icon={soundEnabled?<Volume2 size={15}/>:<VolumeX size={15}/>} title="Efek Suara" sub="Suara saat mencatat transaksi" right={<Tog on={soundEnabled} onToggle={()=>setSoundEnabled(p=>!p)}/>}/>
+        <SRow icon={<BookOpen size={15}/>} title={t("Bahasa / Language")} sub={lang==="id"?"🇮🇩 Indonesia":"🇺🇸 English"} right={<button type="button" onClick={()=>setLang(lang==="id"?"en":"id")} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>{lang==="id"?"Switch to EN":"Ganti ke ID"}</button>}/>
       </Card>
       
       <Card style={{padding:"4px 0",marginBottom:12}}>
-        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>DATA</p>
+        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>{t("Data").toUpperCase()}</p>
         <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button type="button" onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
         <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button type="button" onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
-        <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button type="button" onClick={()=>setShowConfirm(true)} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
+        <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button type="button" onClick={openConfirm} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
       </Card>
       
       <Card style={{padding:"4px 0"}}>
-        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>TENTANG</p>
-        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 7.5 (Sync & Biometrics)"/>
+        <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>{t("Tentang").toUpperCase()}</p>
+        <SRow icon={<Star size={15}/>} title="DompetKu" sub="Versi 8.0 — Full Revision"/>
       </Card>
       
-      {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);setShowSetPin(false);}} onCancel={()=>setShowSetPin(false)}/>}
-      {showConfirm&&<ConfirmDialog title="Hapus Semua Data?" sub="Semua transaksi, akun, dan pengaturan akan dihapus. Tidak bisa dibatalkan." onConfirm={()=>{setTransactions([]);setAccounts([]);setShowConfirm(false);}} onCancel={()=>setShowConfirm(false)}/>}
+      {showSetPin&&<PinScreen mode="set" savedHash={pinHash} onSetPin={h=>{setPinHash(h);setPinEnabled(true);closeSetPin();}} onCancel={closeSetPin}/>}
+      {showConfirm&&<ConfirmDialog title="Hapus Semua Data?" sub="Semua transaksi, akun, dan pengaturan akan dihapus. Tidak bisa dibatalkan." onConfirm={()=>{setTransactions([]);setAccounts([]);closeConfirm();}} onCancel={closeConfirm}/>}
     </div>
   );
 }
 
+
+// ─── ACCOUNT MODAL OVERLAY (for direct edit from AccountDetailScreen) ─────────
+function AccountModalOverlay({ initial, idx, accounts, transactions, setAccounts, setTransactions, onClose }) {
+  const handleSaveAcc = (updated, adjustment) => {
+    setAccounts(p=>p.map(a=>a.id===updated.id ? {...a,...updated,balance:adjustment!=null?(a.balance+adjustment):a.balance} : a));
+    if (adjustment!=null && adjustment!==0) {
+      const adjTxn = { id:generateId(), type:adjustment>0?"income":"expense", amount:Math.abs(adjustment), category:"Penyesuaian Saldo", note:`Penyesuaian saldo — ${updated.name}`, date:todayStr(), time:nowTime(), accountId:updated.id, detected:null, attachmentMeta:[] };
+      setTransactions(p=>[adjTxn,...p]);
+    }
+    onClose();
+  };
+  return <AccountModal initial={initial} onClose={onClose} isNew={false} onSave={handleSaveAcc}/>;
+}
+
 // ─── FAN NAV (MERGED: Symmetric Grid + Staggered Arch Animations) ──────────────
 const ARCH_ITEMS = [
-  { id:"add",          dx:0,   dy:-75,  isAdd:true,  col:G,        label:"Catat",    delay:0   },
-  { id:"transactions", dx:-85, dy:-75,  isAdd:false, col:"#3b82f6", label:"Transaksi",delay:45  },
-  { id:"accounts",     dx:0,   dy:-155, isAdd:false, col:G,         label:"Akun",     delay:90  },
-  { id:"charts",       dx:85,  dy:-75,  isAdd:false, col:"#8b5cf6", label:"Grafik",   delay:135 },
+  //       Transaksi          Akun (top center)      Tambah (below Akun)       Analisis
+  { id:"transactions", dx:-112, dy:-112, kind:"nav", col:"#3b82f6", label:"Transaksi", delay:35  },
+  { id:"accounts",     dx:0,    dy:-176, kind:"nav", col:G,         label:"Akun",      delay:70  },
+  { id:"quickAdd",     dx:0,    dy:-104, kind:"add", col:G,         label:"Tambah",    delay:0   },
+  { id:"charts",       dx:112,  dy:-112, kind:"nav", col:"#8b5cf6", label:"Analisis",  delay:105 },
 ];
 
-function FanNav({ tab, setTab, onAddTxn }) {
+function FanNav({ tab, setTab, onOpenQuickAdd, darkMode }) {
   const [open, setOpen] = useState(false);
   const navTo = id => { setTab(id); setOpen(false); };
-  const handleArchItem = item => { if (item.isAdd) { onAddTxn(); setOpen(false); } else navTo(item.id); };
+  const handleArchItem = item => {
+    if (item.kind === "add") { onOpenQuickAdd?.(); setOpen(false); return; }
+    navTo(item.id);
+  };
 
   const NAV_BOT = "max(calc(env(safe-area-inset-bottom,0px) + 24px),30px)";
 
@@ -1302,23 +2163,23 @@ function FanNav({ tab, setTab, onAddTxn }) {
             display:"flex",flexDirection:"column",alignItems:"center",gap:5,
           }}>
             <div style={{
-              background:"#fff",borderRadius:20,padding:"4px 10px", fontSize:10,fontWeight:700,color:"#111", border:"1.5px solid #e5e7eb",
+              background:"#fff",borderRadius:20,padding:"4px 10px", fontSize:11,fontWeight:700,color:"#111", border:"1.5px solid #e5e7eb",
               boxShadow:"0 3px 12px rgba(0,0,0,0.1)",whiteSpace:"nowrap",
               opacity: open ? 1 : 0, transform: open ? "translateY(0)" : "translateY(6px)",
               transition: open ? `opacity 0.2s ease ${item.delay + 80}ms, transform 0.2s ease ${item.delay + 80}ms` : "none",
             }}>{item.label}</div>
             <button type="button" onClick={()=>handleArchItem(item)} style={{
-              width: item.isAdd ? 50 : 54, height: item.isAdd ? 50 : 54, borderRadius:"50%",
-              background: item.isAdd ? `linear-gradient(145deg,${G},${G2})` : "#fff",
-              border: item.isAdd ? "2.5px solid rgba(255,255,255,0.4)" : "2px solid #e5e7eb",
-              boxShadow: item.isAdd ? `0 6px 20px ${item.col}55` : "0 4px 16px rgba(0,0,0,0.1)",
+              width: item.kind==="add" ? 58 : 56, height: item.kind==="add" ? 58 : 56, borderRadius:"50%",
+              background: item.kind==="add" ? `linear-gradient(145deg,${G},${G2})` : "#fff",
+              border: item.kind==="add" ? "2.5px solid rgba(255,255,255,0.4)" : "2px solid #e5e7eb",
+              boxShadow: item.kind==="add" ? `0 10px 26px ${item.col}55` : "0 6px 18px rgba(0,0,0,0.10)",
               cursor:"pointer", display:"flex",alignItems:"center",justifyContent:"center",
-              color: item.isAdd ? "#fff" : G, outline:"none",
+              color: item.kind==="add" ? "#fff" : G, outline:"none",
             }}>
-              {item.isAdd ? <Plus size={24} strokeWidth={2.5}/>
-                : item.id==="transactions" ? <List size={20} strokeWidth={1.8}/>
-                : item.id==="accounts"     ? <CreditCard size={20} strokeWidth={1.8}/>
-                : <BarChart2 size={20} strokeWidth={1.8}/>}
+              {item.kind==="add" ? <Plus size={24} strokeWidth={2.6}/>
+                : item.id==="transactions" ? <List size={22} strokeWidth={1.9}/>
+                : item.id==="accounts"     ? <CreditCard size={22} strokeWidth={1.9}/>
+                : <BarChart2 size={22} strokeWidth={1.9}/>}
             </button>
           </div>
         );
@@ -1328,24 +2189,34 @@ function FanNav({ tab, setTab, onAddTxn }) {
       <div style={{
         position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)", width:"100%",maxWidth:430,
         background:"#fff",borderTop:"1px solid #f1f5f9",
-        display:"grid",gridTemplateColumns:"1fr 80px 1fr",alignItems:"center",
-        paddingBottom:"max(env(safe-area-inset-bottom,0px),12px)", paddingTop:8,
+        display:"grid",gridTemplateColumns:"1fr 88px 1fr",alignItems:"center",
+        paddingBottom:"max(env(safe-area-inset-bottom,0px),12px)", paddingTop:10,
         zIndex:55, boxShadow:"0 -2px 16px rgba(0,0,0,0.06)"
       }}>
+        {/* Active tab indicator strip */}
+        {!["home","profile"].includes(tab) && (
+          <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${G},#3b82f6)`,borderRadius:"0 0 3px 3px",opacity:0.7}}/>
+        )}
         {/* BERANDA */}
         <div style={{display:"flex",justifyContent:"center"}}>
           <button type="button" onClick={()=>{setTab("home");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
-            <div style={{color:tab==="home"?G:"#9ca3af"}}><Home size={22} strokeWidth={2}/></div>
-            <span style={{fontSize:10,fontWeight:tab==="home"?800:600,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
+            <div style={{color:tab==="home"?G:"#9ca3af"}}><Home size={24} strokeWidth={2}/></div>
+            <span style={{fontSize:11,fontWeight:tab==="home"?800:600,color:tab==="home"?G:"#9ca3af"}}>Beranda</span>
           </button>
         </div>
-        {/* CENTER SPACER */}
-        <div /> 
+        {/* CENTER SPACER — shows current tab name when not on home/profile */}
+        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",paddingTop:2}}>
+          {tab!=="home" && tab!=="profile" && tab!=="charts" && !open && (
+            <span style={{fontSize:9,fontWeight:700,color:G,letterSpacing:0.5,textTransform:"uppercase",opacity:0.8}}>
+              {tab==="transactions"?"Riwayat":tab==="accounts"?"Akun":tab==="charts"?"Analisis":""}
+            </span>
+          )}
+        </div>
         {/* PROFIL */}
         <div style={{display:"flex",justifyContent:"center"}}>
           <button type="button" onClick={()=>{setTab("profile");setOpen(false);}} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",padding:"4px 0"}}>
-            <div style={{color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={22} strokeWidth={2}/></div>
-            <span style={{fontSize:10,fontWeight:tab==="profile"?800:600,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
+            <div style={{color:tab==="profile"?G:"#9ca3af"}}><UserCircle size={24} strokeWidth={2}/></div>
+            <span style={{fontSize:11,fontWeight:tab==="profile"?800:600,color:tab==="profile"?G:"#9ca3af"}}>Profil</span>
           </button>
         </div>
       </div>
@@ -1353,7 +2224,7 @@ function FanNav({ tab, setTab, onAddTxn }) {
       {/* Main FAB DompetKu */}
       <button type="button" onClick={()=>setOpen(p=>!p)} style={{
         position:"fixed", bottom:NAV_BOT, left:"50%", transform:`translateX(-50%)`,
-        width:64,height:64,borderRadius:"50%",
+        width:70,height:70,borderRadius:"50%",
         background: open ? "linear-gradient(145deg,#374151,#1f2937)" : `linear-gradient(145deg,${G},${G2})`,
         border:"3.5px solid #fff",
         boxShadow: open ? "0 8px 28px rgba(0,0,0,0.3)" : `0 6px 24px ${G}60`,
@@ -1375,10 +2246,27 @@ function FanNav({ tab, setTab, onAddTxn }) {
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const isPickingFile = useRef(false);
+  const openFilePicker = useCallback((refEl) => {
+    isPickingFile.current = true;
+    const resetOnFocus = () => {
+      setTimeout(() => { isPickingFile.current = false; }, 400);
+      window.removeEventListener("focus", resetOnFocus);
+    };
+    window.addEventListener("focus", resetOnFocus);
+    refEl.click();
+  }, []);
 
   const [onboarded,    setOnboarded]    = useState(()=>lsGet("dk_onboarded",false));
   const [userName,     setUserName]     = useState(()=>lsGet("dk_name",""));
-  const [userAvatar,   setUserAvatar]   = useState(()=>lsGet("dk_avatar",null));
+  const [userAvatar,   setUserAvatarState] = useState(null);
+  const setUserAvatar = useCallback(async (data) => {
+    setUserAvatarState(data);
+    if (data) { await IDB.put("dk_avatar_v1", data).catch(()=>{}); }
+    else { await IDB.del("dk_avatar_v1").catch(()=>{}); }
+  }, []);
+  useEffect(() => {
+    IDB.get("dk_avatar_v1").then(d => { if(d) setUserAvatarState(d); }).catch(()=>{});
+  }, []);
   const [pinEnabled,   setPinEnabled]   = useState(()=>lsGet("dk_pin_on",false));
   const [pinHash,      setPinHash]      = useState(()=>lsGet("dk_pin_hash",""));
   const [bioEnabled,   setBioEnabled]   = useState(()=>lsGet("dk_bio_on",false));
@@ -1392,17 +2280,20 @@ export default function App() {
 
   const [tab,          setTab]          = useState("home");
   const [showAdd,      setShowAdd]      = useState(false);
+  const [addPrefill,   setAddPrefill]   = useState(null); // { type:"income"|"expense" } | null
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [showImport,   setShowImport]   = useState(false);
   const [txnFilter,    setTxnFilter]    = useState(null);
   const [selectedAcc,  setSelectedAcc]  = useState(null);
   const [editTxn,      setEditTxn]      = useState(null);
   const [viewTxn,      setViewTxn]      = useState(null);
   const [searchOpen,   setSearchOpen]   = useState(false);
+  const [editAccFromDetail, setEditAccFromDetail] = useState(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   useEffect(()=>lsSet("dk_onboarded",onboarded),[onboarded]);
   useEffect(()=>lsSet("dk_name",userName),[userName]);
-  useEffect(()=>lsSet("dk_avatar",userAvatar),[userAvatar]);
   useEffect(()=>lsSet("dk_pin_on",pinEnabled),[pinEnabled]);
   useEffect(()=>lsSet("dk_pin_hash",pinHash),[pinHash]);
   useEffect(()=>lsSet("dk_bio_on",bioEnabled),[bioEnabled]);
@@ -1419,24 +2310,43 @@ export default function App() {
     return()=>document.removeEventListener("visibilitychange",handle);
   },[pinEnabled]);
 
-  // Clean Trapping for Hardware Back Button
+  // Ref-based nav state so handler doesn't need to re-register on every state change
+  const navStateRef = useRef({});
   useEffect(() => {
-    window.history.pushState({dk: "home"}, "");
-    const handlePopState = (e) => {
-      window.history.pushState({dk: "home"}, ""); 
-      if (locked) return;
-      if (showExitConfirm) { setShowExitConfirm(false); return; }
-      if (viewTxn) { setViewTxn(null); return; }
-      if (editTxn) { setEditTxn(null); return; }
-      if (showAdd) { setShowAdd(false); return; }
-      if (showImport) { setShowImport(false); return; }
-      if (selectedAcc) { setSelectedAcc(null); return; }
-      if (tab !== "home") { setTab("home"); return; }
+    navStateRef.current = { locked, viewTxn, editTxn, showAdd, showImport, selectedAcc, tab, showExitConfirm };
+  }, [locked, viewTxn, editTxn, showAdd, showImport, selectedAcc, tab, showExitConfirm]);
+
+  // Screens register a closer function when a local modal is open
+  const closeLocalModalRef = useRef(null);
+  const registerLocalModal = useCallback((closeFn) => { closeLocalModalRef.current = closeFn; }, []);
+  const unregisterLocalModal = useCallback(() => { closeLocalModalRef.current = null; }, []);
+
+  // Push ONE history entry on mount — never again
+  useEffect(() => {
+    window.history.pushState({ dk: "home" }, "");
+  }, []);
+
+  // Register handler ONCE — reads live state from refs
+  useEffect(() => {
+    const handlePopState = () => {
+      window.history.pushState({ dk: "home" }, ""); // always re-trap
+      const s = navStateRef.current;
+      // Bug #4 fix: allow exit confirm even from locked state
+      if (s.locked) { setShowExitConfirm(true); return; }
+      if (s.showExitConfirm) { setShowExitConfirm(false); return; }
+      // Bug #2 fix: close local screen modals before navigating
+      if (closeLocalModalRef.current) { closeLocalModalRef.current(); closeLocalModalRef.current = null; return; }
+      if (s.viewTxn) { setViewTxn(null); return; }
+      if (s.editTxn) { setEditTxn(null); return; }
+      if (s.showAdd) { setShowAdd(false); return; }
+      if (s.showImport) { setShowImport(false); return; }
+      if (s.selectedAcc) { setSelectedAcc(null); return; }
+      if (s.tab !== "home") { setTab("home"); return; }
       setShowExitConfirm(true);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [locked, viewTxn, editTxn, showAdd, showImport, selectedAcc, tab, showExitConfirm]);
+  }, []); // empty deps — registers once, reads state from refs
 
   const deleteTransaction = useCallback(txn=>{
     setTransactions(p=>p.filter(t=>t.id!==txn.id));
@@ -1445,14 +2355,44 @@ export default function App() {
   },[]);
 
   const addTransaction = useCallback(form=>{
+    if(form.type==="transfer"){
+      handleTransferFunds({fromId:form.fromId,toId:form.toId,amount:form.amount,note:form.note});
+      setShowAdd(false); setEditTxn(null); return;
+    }
     const newTxn={...form,id:generateId(),detected:form.detected||null};
     setTransactions(p=>[newTxn,...p]);
     setAccounts(p=>p.map(a=>String(a.id)===String(form.accountId) ? {...a,balance:a.balance+(form.type==="income"?form.amount:-form.amount)} : a));
     setShowAdd(false); setEditTxn(null);
   },[]);
 
-  const updateTransaction = useCallback((original,updated)=>{
-    setAccounts(p=>p.map(a=>{
+  const openAddTxn = useCallback((type) => {
+    if (accounts.length === 0) { setTab("accounts"); return; }
+    setAddPrefill(type ? { type } : null);
+    setShowAdd(true);
+  }, [accounts.length]);
+
+  const handleTransferFunds = useCallback(({ fromId, toId, amount, note }) => {
+    if (!amount || !fromId || !toId || String(fromId) === String(toId)) return;
+    const fromAcc = accounts.find(a => String(a.id) === String(fromId));
+    const toAcc   = accounts.find(a => String(a.id) === String(toId));
+    if (!fromAcc || !toAcc) return;
+
+    setAccounts(p => p.map(a => {
+      if (String(a.id) === String(fromId)) return { ...a, balance: a.balance - amount };
+      if (String(a.id) === String(toId))   return { ...a, balance: a.balance + amount };
+      return a;
+    }));
+
+    const baseNote = note?.trim() ? ` — ${note.trim()}` : "";
+    const date = todayStr();
+    const time = nowTime();
+    const outTxn = { id: generateId(), type:"expense", amount, category:"Penyesuaian Saldo", note:`Transfer ke ${toAcc.name}${baseNote}`, date, time, accountId: fromAcc.id, detected:null, attachmentMeta:[] };
+    const inTxn  = { id: generateId(), type:"income",  amount, category:"Penyesuaian Saldo", note:`Transfer dari ${fromAcc.name}${baseNote}`, date, time, accountId: toAcc.id,   detected:null, attachmentMeta:[] };
+    setTransactions(p => [outTxn, inTxn, ...p]);
+    setShowTransfer(false);
+  }, [accounts]);
+
+  const updateTransaction = useCallback((original,updated)=>{    setAccounts(p=>p.map(a=>{
       let bal=a.balance;
       if(String(a.id)===String(original.accountId)) bal += original.type==="income"?-original.amount:original.amount;
       if(String(a.id)===String(updated.accountId))  bal += updated.type==="income"?updated.amount:-updated.amount;
@@ -1461,6 +2401,11 @@ export default function App() {
     setTransactions(p=>p.map(t=>t.id===original.id?{...updated,id:original.id}:t));
     setEditTxn(null); setViewTxn(null);
   },[]);
+
+  const updateTxnDetails = useCallback((txnId, details) => {
+    setTransactions(p => p.map(t => t.id === txnId ? {...t, details} : t));
+    setViewTxn(prev => prev && prev.id === txnId ? {...prev, details} : prev);
+  }, []);
 
   const importTxns = useCallback(txns=>{
     setTransactions(p => [...txns, ...p]);
@@ -1473,15 +2418,16 @@ export default function App() {
 
   const titleMap={home:"Beranda",transactions:"Riwayat",accounts:"Akun",charts:"Analisis",profile:"Profil"};
 
-  if(!onboarded)return<OnboardingScreen onDone={name=>{setUserName(name);setOnboarded(true);}}/>;
+  if(!onboarded)return<OnboardingScreen onDone={data=>{const {name,age,job,edu}=typeof data==="string"?{name:data,age:0,job:"",edu:""}:data;setUserName(name);lsSet("dk_age",age);lsSet("dk_job",job);lsSet("dk_edu",edu);setOnboarded(true);}}/>;
   if(locked&&pinEnabled)return<PinScreen mode="unlock" savedHash={pinHash} bioEnabled={bioEnabled} onUnlock={()=>setLocked(false)}/>;
-  if(selectedAcc)return <AccountDetailScreen account={selectedAcc.acc} transactions={transactions} accIdx={selectedAcc.idx} onClose={()=>setSelectedAcc(null)} onEditAccount={()=>{setSelectedAcc(null);setTab("accounts");}}/>;
+  if(selectedAcc)return <AccountDetailScreen account={selectedAcc.acc} transactions={transactions} accIdx={selectedAcc.idx} onClose={()=>setSelectedAcc(null)} onEditAccount={()=>{setSelectedAcc(null);setTab("accounts");}} onDirectEdit={({acc,idx})=>{setSelectedAcc(null);setTimeout(()=>setEditAccFromDetail({acc,idx}),80);}}/>;
 
   return (
     <div style={{fontFamily:"'Outfit',sans-serif",background:BG,minHeight:"100vh",maxWidth:430,margin:"0 auto",paddingBottom:90}}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+      <FontLoader/>
       <style>{`
-        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;}
+        input,textarea{-webkit-user-select:text;user-select:text;}
         input,select,button{font-family:'Outfit',sans-serif;}
         button:focus,input:focus,select:focus{outline:none;}
         ::-webkit-scrollbar{width:0;height:0;}
@@ -1506,21 +2452,30 @@ export default function App() {
 
       {/* CONTENT */}
       <div style={{paddingTop:14}} className="screen" key={tab}>
-        {tab==="home"&&<HomeScreen accounts={accounts} transactions={transactions} monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget} savedPct={savedPct} setSavedPct={setSavedPct} userName={userName} userAvatar={userAvatar} setTab={setTab} setTxnFilter={setTxnFilter} setSelectedAcc={setSelectedAcc} hidden={hidden} setHidden={setHidden} onTxnClick={t=>setViewTxn(t)}/>}
+        {tab==="home"&&<HomeScreen accounts={accounts} transactions={transactions} monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget} savedPct={savedPct} setSavedPct={setSavedPct} userName={userName} userAvatar={userAvatar} setTab={setTab} setTxnFilter={setTxnFilter} setSelectedAcc={setSelectedAcc} hidden={hidden} setHidden={setHidden} onTxnClick={t=>setViewTxn(t)} registerLocalModal={registerLocalModal} unregisterLocalModal={unregisterLocalModal}/>}
         {tab==="transactions"&&<TransactionsScreen transactions={transactions} accounts={accounts} onDelete={deleteTransaction} onEdit={t=>{setEditTxn(t);}} onTxnClick={t=>setViewTxn(t)} initialTypeFilter={txnFilter} onFilterConsumed={()=>setTxnFilter(null)} searchOpen={searchOpen} onSearchClose={()=>setSearchOpen(false)}/>}
-        {tab==="accounts"&&<AccountsScreen accounts={accounts} setAccounts={setAccounts} transactions={transactions} setTransactions={setTransactions} setSelectedAcc={setSelectedAcc}/>}
+        {tab==="accounts"&&<AccountsScreen accounts={accounts} setAccounts={setAccounts} transactions={transactions} setTransactions={setTransactions} setSelectedAcc={setSelectedAcc} registerLocalModal={registerLocalModal} unregisterLocalModal={unregisterLocalModal} onOpenTransfer={()=>{ if(accounts.length<2){return;} setShowTransfer(true); }}/>}
         {tab==="charts"&&<ChartsScreen transactions={transactions}/>}
-        {tab==="profile"&&<ProfileScreen userName={userName} setUserName={setUserName} userAvatar={userAvatar} setUserAvatar={setUserAvatar} transactions={transactions} accounts={accounts} pinEnabled={pinEnabled} pinHash={pinHash} setPinEnabled={setPinEnabled} setPinHash={h=>{setPinHash(h);setPinEnabled(true);}} bioEnabled={bioEnabled} setBioEnabled={setBioEnabled} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} setTransactions={setTransactions} setAccounts={setAccounts} setShowImport={setShowImport}/>}
+        {tab==="profile"&&<ProfileScreen userName={userName} setUserName={setUserName} userAvatar={userAvatar} setUserAvatar={setUserAvatar} transactions={transactions} accounts={accounts} pinEnabled={pinEnabled} pinHash={pinHash} setPinEnabled={setPinEnabled} setPinHash={h=>{setPinHash(h);setPinEnabled(true);}} bioEnabled={bioEnabled} setBioEnabled={setBioEnabled} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} setTransactions={setTransactions} setAccounts={setAccounts} setShowImport={setShowImport} registerLocalModal={registerLocalModal} unregisterLocalModal={unregisterLocalModal}/>}
       </div>
 
       {/* ULTIMATE FAN NAV */}
-      <FanNav tab={tab} setTab={setTab} onAddTxn={()=>{ if(accounts.length===0){setTab("accounts");}else{setShowAdd(true);}}}/>
+      <FanNav tab={tab} setTab={setTab} onOpenQuickAdd={()=>{if(accounts.length===0){setTab("accounts");return;}setAddPrefill(null);setShowAdd(true);}}/>
 
       {/* MODALS */}
-      {showAdd&&accounts.length>0&&<TxnModal accounts={accounts} onClose={()=>setShowAdd(false)} onSave={addTransaction} soundEnabled={soundEnabled} isPickingFile={isPickingFile}/>}
-      {editTxn&&<TxnModal initial={{...editTxn,amountStr:editTxn.amount.toLocaleString("id-ID")}} accounts={accounts} onClose={()=>setEditTxn(null)} onSave={updated=>updateTransaction(editTxn,updated)} soundEnabled={soundEnabled} isPickingFile={isPickingFile}/>}
-      {showImport&&<ImportModal accounts={accounts} onClose={()=>setShowImport(false)} onImport={importTxns} isPickingFile={isPickingFile}/>}
-      {viewTxn&&<TxnDetailSheet txn={viewTxn} accounts={accounts} onClose={()=>setViewTxn(null)} onEdit={t=>{ setViewTxn(null); setEditTxn(t); }} onDelete={t=>{ deleteTransaction(t); setViewTxn(null); }}/>}
+      {showAdd&&accounts.length>0&&<TxnModal initial={addPrefill||undefined} accounts={accounts} onClose={()=>{setShowAdd(false);setAddPrefill(null);}} onSave={addTransaction} soundEnabled={soundEnabled} isPickingFile={isPickingFile} openFilePicker={openFilePicker}/>}
+      {editTxn&&<TxnModal initial={{...editTxn,amountStr:editTxn.amount.toLocaleString("id-ID")}} accounts={accounts} onClose={()=>setEditTxn(null)} onSave={updated=>updateTransaction(editTxn,updated)} soundEnabled={soundEnabled} isPickingFile={isPickingFile} openFilePicker={openFilePicker}/>}
+      {showImport&&<ImportModal accounts={accounts} onClose={()=>setShowImport(false)} onImport={importTxns} isPickingFile={isPickingFile} openFilePicker={openFilePicker}/>}
+      {viewTxn&&<TxnDetailSheet txn={viewTxn} accounts={accounts} onClose={()=>setViewTxn(null)} onEdit={t=>{ setViewTxn(null); setEditTxn(t); }} onDelete={t=>{ deleteTransaction(t); setViewTxn(null); }} onSaveDetails={updateTxnDetails}/>}
+
+      {editAccFromDetail&&<AccountModalOverlay initial={editAccFromDetail.acc} idx={editAccFromDetail.idx} accounts={accounts} transactions={transactions} setAccounts={setAccounts} setTransactions={setTransactions} onClose={()=>setEditAccFromDetail(null)}/>}
+      {showTransfer&&(
+        <TransferModal
+          accounts={accounts}
+          onClose={()=>setShowTransfer(false)}
+          onTransfer={handleTransferFunds}
+        />
+      )}
       
       {/* Safe Exit Flow */}
       {showExitConfirm&&<ConfirmDialog title="Keluar dari DompetKu?" sub="Yakin ingin menutup aplikasi?" danger={false} confirmLabel="Keluar" 
