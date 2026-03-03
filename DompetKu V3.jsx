@@ -2203,8 +2203,6 @@ function ChartsScreen({ transactions }) {
   );
   const totalInc = trackedTxns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
   const totalExp = trackedTxns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
-  const totalInc = trackedTxns.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
-  const totalExp = trackedTxns.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
   const pieData = useMemo(()=>{
     const m={};
     trackedTxns.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});
@@ -2780,10 +2778,6 @@ function FanNav({ tab, setTab, onOpenQuickAdd, darkMode }) {
         </div>
         {/* CENTER SPACER */}
         <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",paddingTop:2}}>
-          {false && (
-            <span style={{fontSize:9}}>
-              {""}
-          )}
         </div>
         {/* PROFIL */}
         <div style={{display:"flex",justifyContent:"center"}}>
