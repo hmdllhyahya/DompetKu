@@ -814,6 +814,8 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
 // ─── TXN DETAIL SHEET ─────────────────────────────────────────────────────────
 function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete, onSaveDetails }) {
   const acc      = accounts.find(a=>String(a.id)===String(txn.accountId));
+  const fromAcc  = accounts.find(a=>String(a.id)===String(txn.fromId || txn.accountId));
+  const toAcc    = accounts.find(a=>String(a.id)===String(txn.toId));
   const fields   = getTxnDetailFields(txn);
   const [details, setDetails] = useState(txn.details || {});
   const [editing, setEditing] = useState(false);
@@ -843,8 +845,8 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete, onSaveDetail
             </div>
             <p style={{color:"#fff",fontSize:13,fontWeight:600,margin:"0 0 2px"}}>{txn.note||"Transaksi"}</p>
             <p style={{color:"#fff",fontSize:28,fontWeight:800,margin:"0 0 4px"}}>{txn.type==="income"?"+":"-"}{fmt(txn.amount)}</p>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
+              {txn.type==="transfer" ? (
                 <><span style={{background:"rgba(255,255,255,0.2)",color:"#fff",fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:99}}>{fromAcc?.name||"?"}</span>
                 <span style={{color:"rgba(255,255,255,0.8)",fontSize:14}}>→</span>
                 <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:99}}>{toAcc?.name||"?"}</span></>
