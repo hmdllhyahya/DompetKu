@@ -10,7 +10,8 @@ import {
   Heart, BookOpen, Scissors, Briefcase, Gift, TrendingUp, MoreHorizontal,
   Monitor, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, Fingerprint,
   PiggyBank, Receipt, Star, Sliders,
-  ExternalLink, MapPin, Film, Train, Bus, Calendar, Clock
+  ExternalLink, MapPin, Film, Train, Bus, Calendar, Clock,
+  Trophy, Target, RefreshCw, Globe, Calculator, ArrowLeft
 } from "lucide-react";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
@@ -60,6 +61,41 @@ const TRANSLATIONS = {
   "Export CSV": "Export CSV", "Hapus Semua Data": "Delete All Data",
   "Bahasa / Language": "Language / Bahasa",
   "Tentang": "About",
+  // Transactions screen
+  "Semua": "All", "Bulan Ini": "This Month", "Hari Ini": "Today",
+  "Minggu Ini": "This Week", "Custom": "Custom", "Tahun Ini": "This Year",
+  "Riwayat Transaksi": "Transaction History",
+  "Transaksi": "Transactions", "Cari transaksi, kategori...": "Search transactions, category...",
+  "Tidak ada transaksi": "No transactions", "Coba ubah filter": "Try changing filters",
+  // Accounts screen
+  "Tambah Akun": "Add Account", "Edit Akun": "Edit Account",
+  "Hapus Akun": "Delete Account", "Saldo": "Balance",
+  "Tabungan": "Savings", "Investasi": "Investments",
+  // Transfer
+  "Transfer Dana": "Transfer Funds", "DARI AKUN": "FROM ACCOUNT",
+  "KE AKUN": "TO ACCOUNT", "JUMLAH": "AMOUNT", "CATATAN": "NOTE",
+  "Lakukan Transfer": "Execute Transfer",
+  // Budget
+  "Anggaran Bulanan": "Monthly Budget", "Sisa hari bulan ini": "Days left this month",
+  "Ditabung": "Saved", "Bisa Dibelanjakan": "Spendable",
+  "Budget Final Dipakai": "Final Budget", "Limit Harian Ideal": "Daily Limit",
+  // Import
+  "Import Data": "Import Data", "Format yang Didukung": "Supported Formats",
+  "Pilih File": "Choose File", "Import Berhasil!": "Import Successful!",
+  "Selesai": "Done", "Coba Lagi": "Try Again", "Membaca file...": "Reading file...",
+  // Charts
+  "Bulan": "Month", "Minggu": "Week", "Tahun": "Year",
+  "Analisis Gaya Hidup": "Lifestyle Analysis",
+  "TOP 3 PENGELUARAN (30 HARI)": "TOP 3 EXPENSES (30 DAYS)",
+  "FUN FACT": "FUN FACT", "MISI MINGGU INI": "THIS WEEK'S MISSION",
+  // Profile
+  "Nama": "Name", "Pekerjaan": "Occupation", "Usia": "Age",
+  "Simpan": "Save", "Hapus": "Delete", "Batal": "Cancel",
+  "Lanjutkan": "Continue", "Import": "Import", "Export": "Export",
+  "Versi": "Version",
+  // Misc
+  "Keluar hari ini": "Today's spending",
+  "Sisa hari ini": "Today's remaining",
 };
 
 function useLang() {
@@ -549,9 +585,9 @@ function OnboardingScreen({ onDone }) {
   const [edu,setEdu]=useState("");
   const touchStartX=useRef(0);
   const slides=[
-    {icon:"💰",title:"Catat Keuanganmu",desc:"Lacak setiap pemasukan dan pengeluaran dengan mudah dan cepat."},
-    {icon:"📊",title:"Analisis Pengeluaran",desc:"Visualisasi lengkap kategori pengeluaranmu setiap bulan."},
-    {icon:"🎯",title:"Capai Target Tabungan",desc:"Set budget bulanan dan pantau progress tabunganmu."},
+    {icon:<Coins size={32} strokeWidth={1.7}/>,title:"Catat Keuanganmu",desc:"Lacak setiap pemasukan dan pengeluaran dengan mudah dan cepat."},
+    {icon:<BarChart2 size={32} strokeWidth={1.7}/>,title:"Analisis Pengeluaran",desc:"Visualisasi lengkap kategori pengeluaranmu setiap bulan."},
+    {icon:<Target size={32} strokeWidth={1.7}/>,title:"Capai Target Tabungan",desc:"Set budget bulanan dan pantau progress tabunganmu."},
   ];
   // steps: 0,1,2 = slides; 3=nama; 4=umur; 5=pekerjaan; 6=pendidikan
   const TOTAL_PROFILE_STEPS = 4; // name, age, job, edu
@@ -812,7 +848,9 @@ function AccountModal({ initial, onClose, onSave, isNew }) {
 }
 
 // ─── TXN DETAIL SHEET ─────────────────────────────────────────────────────────
-function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete, onSaveDetails }) {
+function TxnDetailSheet({
+  txn, accounts, onClose, onEdit, onDelete, onSaveDetails }) {
+  const { t } = useLang();
   const acc      = accounts.find(a=>String(a.id)===String(txn.accountId));
   const fromAcc  = accounts.find(a=>String(a.id)===String(txn.fromId || txn.accountId));
   const toAcc    = accounts.find(a=>String(a.id)===String(txn.toId));
@@ -890,7 +928,7 @@ function TxnDetailSheet({ txn, accounts, onClose, onEdit, onDelete, onSaveDetail
           </Card>}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:4}}>
             <button type="button" onClick={()=>onEdit(txn)} style={{padding:"13px",background:GL,border:"none",borderRadius:14,color:G,fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={15}/>Edit</button>
-            <button type="button" onClick={()=>setShowDel(true)} style={{padding:"13px",background:"#fef2f2",border:"none",borderRadius:14,color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Trash2 size={15}/>Hapus</button>
+            <button type="button" onClick={()=>setShowDel(true)} style={{padding:"13px",background:"#fef2f2",border:"none",borderRadius:14,color:"#ef4444",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Trash2 size={15}/>{t("Hapus")}</button>
           </div>
         </div>
       </div>
@@ -928,23 +966,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
     else{
       const sug=suggestCategory(v);
       setSugCat(sug&&!CATS_EXP.includes(sug)?sug:null);
-      // AI fallback: if no match and text >= 3 chars, ask Claude
-      if(!sug && v.trim().length>=3) {
-        clearTimeout(aiTimerRef.current);
-        aiTimerRef.current = setTimeout(async()=>{
-          try {
-            const res = await fetch("https://api.anthropic.com/v1/messages",{
-              method:"POST", headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:80,
-                messages:[{role:"user",content:`Ini nama transaksi keuangan: "${v.trim()}". Termasuk kategori apa dari daftar ini? ${[...CATS_EXP,...CATS_INC].join(", ")}. Jawab HANYA nama kategori saja, tanpa penjelasan.`}]
-              })
-            });
-            const data = await res.json();
-            const aiCat = data.content?.[0]?.text?.trim();
-            if(aiCat&&[...CATS_EXP,...CATS_INC].includes(aiCat)) setSugCat(aiCat);
-          } catch(e) {}
-        }, 800);
-      }
+
     }
   };
   const handleAmt  = e => { const raw=e.target.value.replace(/\D/g,""); s("amountStr",raw?parseInt(raw).toLocaleString("id-ID"):""); };
@@ -1021,7 +1043,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
       <Inp label="JUMLAH (RP)"><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18,fontWeight:700,color:"#9ca3af"}}>Rp</span><input inputMode="numeric" placeholder="0" value={form.amountStr||""} onChange={handleAmt} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:28,fontWeight:800,color:"#111"}}/></div></Inp>
       <Inp label="CATATAN / NAMA TOKO" mb={detected?6:10}><input placeholder="cth: Indomaret, GoFood..." value={form.note||""} onChange={e=>handleNote(e.target.value)} style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:14,color:"#111"}}/></Inp>
       {detected&&<div style={{display:"flex",alignItems:"center",gap:7,padding:"8px 13px",background:GL,borderRadius:11,marginBottom:10,border:`1px solid ${GM}`}}><Check size={13} color={G}/><span style={{color:G,fontSize:12,fontWeight:600}}>Auto-detect: {detected.cat}</span></div>}
-      {!detected&&sugCat&&<div style={{display:"flex",alignItems:"center",gap:7,padding:"8px 13px",background:"#fff3cd",borderRadius:11,marginBottom:10,border:"1px solid #fde68a"}}><Star size={13} color="#f59e0b"/><span style={{color:"#92400e",fontSize:12,fontWeight:600}}>Saran kategori: <b>{sugCat}</b></span><button type="button" onClick={()=>{setSugCat(null);s("category","Lainnya");}} style={{marginLeft:"auto",background:"none",border:"none",fontSize:10,color:"#9ca3af",cursor:"pointer"}}>✕</button></div>}
+      {!detected&&sugCat&&<div style={{display:"flex",alignItems:"center",gap:7,padding:"8px 13px",background:"#fff3cd",borderRadius:11,marginBottom:10,border:"1px solid #fde68a"}}><Star size={13} color="#f59e0b"/><span style={{color:"#92400e",fontSize:12,fontWeight:600}}>Saran kategori: <b>{sugCat}</b></span><button type="button" onClick={()=>{setSugCat(null);s("category","Lainnya");}} style={{marginLeft:"auto",background:"none",border:"none",cursor:"pointer",color:"#9ca3af",display:"flex",alignItems:"center"}}><X size={12}/></button></div>}
       <Inp label="KATEGORI">
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
           {cats.map(c=>(
@@ -1039,7 +1061,7 @@ function TxnModal({ initial, accounts, onClose, onSave, soundEnabled, isPickingF
         <input ref={fileRef} type="file" accept="image/*,.pdf" multiple style={{display:"none"}} onChange={handleFile}/>
         {(form.attachmentMeta||[]).length>0&&(
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-            {form.attachmentMeta.map(a=>(<div key={a.id} style={{position:"relative",width:52,height:52}}><AttachPreview id={a.id} type={a.type}/><button type="button" onClick={()=>removeAttachment(a.id)} style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>))}
+            {form.attachmentMeta.map(a=>(<div key={a.id} style={{position:"relative",width:52,height:52}}><AttachPreview id={a.id} type={a.type}/><button type="button" onClick={()=>removeAttachment(a.id)} style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:"#ef4444",border:"none",color:"#fff",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={9}/></button></div>))}
           </div>
         )}
       </Inp>
@@ -1268,7 +1290,7 @@ function ImportModal({ accounts, onClose, onImport, isPickingFile, openFilePicke
         <BtnG onClick={()=>openFilePicker(ref.current)}>Pilih File</BtnG>
         <input ref={ref} type="file" accept=".xlsx,.xls,.csv,.ods" style={{display:"none"}} onChange={parse}/>
       </div>}
-      {st==="parsing"&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:36,animation:"spin 1.5s linear infinite",display:"inline-block"}}>⚙️</div><p style={{color:G,marginTop:12}}>Membaca file...</p></div>}
+      {st==="parsing"&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{animation:"spin 1.5s linear infinite",display:"inline-block",color:G}}><RefreshCw size={34} strokeWidth={1.8}/></div><p style={{color:G,marginTop:12}}>Membaca file...</p></div>}
       {st==="error"&&<div style={{textAlign:"center",padding:"20px 0"}}><div style={{color:"#ef4444",display:"flex",justifyContent:"center",marginBottom:12}}><AlertTriangle size={40}/></div><p style={{color:"#ef4444",fontWeight:600,marginBottom:20}}>{err}</p><BtnG onClick={()=>{setSt("idle");setErr("");}}>Coba Lagi</BtnG></div>}
       {st==="review"&&<div>
         <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",borderRadius:14,padding:"12px 14px",marginBottom:12}}>
@@ -1374,6 +1396,7 @@ function AccountDetailScreen({ account, transactions, accIdx, onClose, onEditAcc
   );
 }
 
+
 // ─── HOME SCREEN ──────────────────────────────────────────────────────────────
 function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, savedPct, setSavedPct, userName, userAvatar, setTab, setTxnFilter, setSelectedAcc, hidden, setHidden, onTxnClick, registerLocalModal, unregisterLocalModal }) {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -1469,10 +1492,10 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
         </div>
       </div>
 
-      <div style={{display:"flex", gap:10, overflowX:"auto", paddingBottom:10, paddingLeft:16, paddingRight:16, margin:"0 -16px", scrollSnapType:"x mandatory", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none"}}>
+      <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:10,scrollSnapType:"x mandatory",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none"}}>
         <style>{`::-webkit-scrollbar{display:none}`}</style>
         {/* Budget Card */}
-        <div style={{minWidth:"calc(100% - 32px)", scrollSnapAlign:"start", flexShrink:0}}>
+        <div style={{minWidth:"100%",scrollSnapAlign:"start",flexShrink:0}}>
           <Card style={{marginBottom:0, display:"flex", flexDirection:"column", padding:"16px 20px"}}>
             <Row style={{marginBottom:10}}>
               <p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>{LANG_CTX.lang==="en"?"Monthly Budget":"Anggaran Bulanan"}</p>
@@ -1502,9 +1525,8 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
             </div>
           </Card>
         </div>
-        
         {/* Predictor Card */}
-        <div style={{minWidth:"calc(100vw - 32px)",maxWidth:430,width:"calc(100vw - 32px)",scrollSnapAlign:"start",scrollSnapStop:"always",flexShrink:0}}>
+        <div style={{minWidth:"100%",scrollSnapAlign:"start",scrollSnapStop:"always",flexShrink:0}}>
           <Card style={{marginBottom:0, background:`linear-gradient(145deg,#0a4f38,${G2})`, display:"flex", flexDirection:"column"}}>
             <Row style={{marginBottom:6}}>
               <p style={{margin:0,fontSize:14,fontWeight:800,color:"#fff"}}>Prediksi Keuangan</p>
@@ -1541,7 +1563,6 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
           </Card>
         </div>
       </div>
-
       <Row style={{marginBottom:10}}><p style={{margin:0,fontSize:14,fontWeight:800,color:"#111"}}>Akun Saya</p><button type="button" onClick={()=>setTab("accounts")} style={{background:"none",border:"none",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>Lihat semua</button></Row>
       <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:6,scrollbarWidth:"none"}}>
         {accounts.length===0&&<div style={{background:"#fff",borderRadius:16,padding:"14px 20px",minWidth:160,color:"#9ca3af",fontSize:12}}>Belum ada akun</div>}
@@ -1587,7 +1608,9 @@ function HomeScreen({ accounts, transactions, monthlyBudget, setMonthlyBudget, s
 }
 
 // ─── TRANSACTIONS SCREEN ──────────────────────────────────────────────────────
-function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnClick, initialTypeFilter, onFilterConsumed, searchOpen, onSearchClose }) {
+function TransactionsScreen({
+  transactions, accounts, onDelete, onEdit, onTxnClick, initialTypeFilter, onFilterConsumed, searchOpen, onSearchClose }) {
+  const { t } = useLang();
   const [typeF, setTypeF] = useState(initialTypeFilter||"all");
   const [dateF, setDateF] = useState("month");
   const [from,  setFrom]  = useState("");
@@ -1627,11 +1650,11 @@ function TransactionsScreen({ transactions, accounts, onDelete, onEdit, onTxnCli
     <div style={{padding:"0 16px 16px"}}>
       {(searchOpen||search)&&(
         <div style={{display:"flex",alignItems:"center",gap:8,background:"#fff",borderRadius:14,padding:"10px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <Search size={16} color="#9ca3af"/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari transaksi, kategori..." style={{flex:1,border:"none",outline:"none",fontSize:14,color:"#111",background:"transparent"}}/><button type="button" onClick={()=>{setSearch("");onSearchClose?.();}} style={{background:"none",border:"none",cursor:"pointer",color:"#9ca3af",display:"flex"}}><X size={16}/></button>
+          <Search size={16} color="#9ca3af"/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder={t("Cari transaksi, kategori...")} style={{flex:1,border:"none",outline:"none",fontSize:14,color:"#111",background:"transparent"}}/><button type="button" onClick={()=>{setSearch("");onSearchClose?.();}} style={{background:"none",border:"none",cursor:"pointer",color:"#9ca3af",display:"flex"}}><X size={16}/></button>
         </div>
       )}
-      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,marginBottom:8,scrollbarWidth:"none"}}><FP label="Semua" active={typeF==="all"} onClick={()=>setTypeF("all")}/><FP label="Pengeluaran" active={typeF==="expense"} onClick={()=>setTypeF("expense")} col="#ef4444"/><FP label="Pemasukan" active={typeF==="income"} onClick={()=>setTypeF("income")} col={G}/></div>
-      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:10,scrollbarWidth:"none"}}>{[{id:"all",l:"Semua"},{id:"month",l:"Bulan Ini"},{id:"today",l:"Hari Ini"},{id:"week",l:"Minggu Ini"},{id:"custom",l:"Custom"}].map(f=><FP key={f.id} label={f.l} active={dateF===f.id} onClick={()=>setDateF(f.id)}/>)}</div>
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,marginBottom:8,scrollbarWidth:"none"}}><FP label={t("Semua")} active={typeF==="all"} onClick={()=>setTypeF("all")}/><FP label={t("Pengeluaran")} active={typeF==="expense"} onClick={()=>setTypeF("expense")} col="#ef4444"/><FP label={t("Pemasukan")} active={typeF==="income"} onClick={()=>setTypeF("income")} col={G}/></div>
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:10,scrollbarWidth:"none"}}>{[{id:"all",l:t("Semua")},{id:"month",l:t("Bulan Ini")},{id:"today",l:t("Hari Ini")},{id:"week",l:t("Minggu Ini")},{id:"custom",l:t("Custom")}].map(f=><FP key={f.id} label={f.l} active={dateF===f.id} onClick={()=>setDateF(f.id)}/>)}</div>
       {dateF==="custom"&&<Card style={{marginBottom:10}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div><p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700}}>DARI</p><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",colorScheme:"light",background:"transparent",width:"100%"}}/></div><div><p style={{margin:"0 0 4px",fontSize:10,color:"#9ca3af",fontWeight:700}}>SAMPAI</p><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{border:"none",outline:"none",fontSize:12,fontWeight:600,color:"#111",colorScheme:"light",background:"transparent",width:"100%"}}/></div></div></Card>}
       <div style={{background:`linear-gradient(135deg,${G},${G2})`,borderRadius:18,padding:"16px 18px",marginBottom:14}}>
         <Row><span style={{color:"rgba(255,255,255,0.8)",fontSize:12}}>{filtered.length} transaksi</span></Row>
@@ -1835,7 +1858,7 @@ function CurrencyModal({ totalBalance, onClose }) {
 
       {loading?(
         <div style={{textAlign:"center",padding:"20px 0"}}>
-          <div style={{fontSize:24,animation:"spin 1s linear infinite",display:"inline-block"}}>⚙️</div>
+          <div style={{animation:"spin 1s linear infinite",display:"inline-block",color:G}}><RefreshCw size={22} strokeWidth={1.8}/></div>
           <p style={{color:G,fontSize:12,marginTop:8}}>Mengambil kurs real-time...</p>
         </div>
       ):(
@@ -1861,7 +1884,7 @@ function CurrencyModal({ totalBalance, onClose }) {
           <div style={{background:"#fff",width:"100%",maxWidth:430,margin:"0 auto",borderRadius:"20px 20px 0 0",maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"16px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <p style={{margin:0,fontSize:15,fontWeight:800,color:"#111"}}>Pilih Negara</p>
-              <button type="button" onClick={()=>setShowPicker(false)} style={{background:"#f1f5f9",border:"none",borderRadius:99,width:32,height:32,cursor:"pointer",fontSize:16}}>✕</button>
+              <button type="button" onClick={()=>setShowPicker(false)} style={{background:"#f1f5f9",border:"none",borderRadius:99,width:32,height:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={15}/></button>
             </div>
             <div style={{padding:"10px 16px"}}>
               <input value={pickSearch} onChange={e=>setPickSearch(e.target.value)} placeholder="Cari negara atau kode mata uang..."
@@ -2100,18 +2123,6 @@ function PieCatCard({ pieData, totalExp }) {
               data={pieData} cx="50%" cy="50%" outerRadius={90} innerRadius={55} paddingAngle={2}
               dataKey="value" style={{outline:"none"}} stroke="none"
               activeIndex={activeIdx}
-              activeShape={(props)=>{
-                const {cx,cy,innerRadius,outerRadius,startAngle,endAngle,fill}=props;
-                return(
-                  <g>
-                    <path d={`M${cx},${cy}m0,0`} fill="none"/>
-                    <path d={require("recharts").default?.Sector?"":`M${cx},${cy}`} fill={fill} opacity={1}/>
-                    <g>
-                      <path style={{filter:"drop-shadow(0 4px 8px rgba(0,0,0,0.2))"}}/>
-                    </g>
-                  </g>
-                );
-              }}
               onMouseEnter={(_,idx)=>setActiveIdx(idx)}
               onMouseLeave={()=>setActiveIdx(null)}
               onClick={(_,idx)=>setActiveIdx(ai=>ai===idx?null:idx)}
@@ -2124,7 +2135,6 @@ function PieCatCard({ pieData, totalExp }) {
                 />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip/>}/>
           </PieChart>
         </ResponsiveContainer>
         <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
@@ -2141,20 +2151,22 @@ function PieCatCard({ pieData, totalExp }) {
           )}
         </div>
       </div>
-      {/* External tooltip - shown ABOVE pie, not inside it */}
-      {activeName!=null&&pieData[activeIdx]&&(
-        <div style={{background:"#fff",border:`2px solid ${CAT_COLORS[activeName]||"#e5e7eb"}`,borderRadius:14,padding:"8px 14px",
-          marginBottom:8,display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 16px rgba(0,0,0,0.10)"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:CAT_BG[activeName]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",color:CAT_COLORS[activeName]||"#9ca3af"}}>
-            {CAT_ICON(activeName,18)}
+      {/* External tooltip - shown BELOW pie, outside chart area */}
+      <div style={{minHeight:58,marginBottom:4}}>
+        {activeName!=null&&pieData[activeIdx]&&(
+          <div style={{background:"#fff",border:`2px solid ${CAT_COLORS[activeName]||"#e5e7eb"}`,borderRadius:14,padding:"8px 14px",
+            display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 16px rgba(0,0,0,0.10)"}}>
+            <div style={{width:36,height:36,borderRadius:10,background:CAT_BG[activeName]||"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",color:CAT_COLORS[activeName]||"#9ca3af"}}>
+              {CAT_ICON(activeName,18)}
+            </div>
+            <div style={{flex:1}}>
+              <p style={{margin:0,fontSize:12,fontWeight:800,color:"#111"}}>{activeName}</p>
+              <p style={{margin:"1px 0 0",fontSize:10,color:"#9ca3af"}}>{pieData[activeIdx]?.pct}% dari total pengeluaran</p>
+            </div>
+            <p style={{margin:0,fontSize:14,fontWeight:900,color:CAT_COLORS[activeName]||G}}>{fmt(pieData[activeIdx]?.value||0)}</p>
           </div>
-          <div style={{flex:1}}>
-            <p style={{margin:0,fontSize:12,fontWeight:800,color:"#111"}}>{activeName}</p>
-            <p style={{margin:"1px 0 0",fontSize:10,color:"#9ca3af"}}>{pieData[activeIdx]?.pct}% dari total pengeluaran</p>
-          </div>
-          <p style={{margin:0,fontSize:14,fontWeight:900,color:CAT_COLORS[activeName]||G}}>{fmt(pieData[activeIdx]?.value||0)}</p>
-        </div>
-      )}
+        )}
+      </div>
       <div style={{marginTop:8}}>
         {pieData.slice(0,6).map((p,i)=>{
           const isActive = activeName===p.name;
@@ -2177,7 +2189,9 @@ function PieCatCard({ pieData, totalExp }) {
 }
 
 // ─── CHARTS SCREEN ────────────────────────────────────────────────────────────
-function ChartsScreen({ transactions }) {
+function ChartsScreen({
+  transactions }) {
+  const { t } = useLang();
   const [typeF, setTypeF] = useState("all");   // all/income/expense/transfer
   const [dateF, setDateF] = useState("all");   // all/today/week/month/year/custom
   const [customFrom, setCustomFrom] = useState("");
@@ -2342,7 +2356,7 @@ function ChartsScreen({ transactions }) {
     <div style={{padding:"0 16px 16px"}}>
       {/* Type Filter */}
       <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none",marginBottom:8,paddingBottom:2}}>
-        {[{id:"all",l:"Semua"},{id:"expense",l:"Pengeluaran"},{id:"income",l:"Pemasukan"},{id:"transfer",l:"Transfer"}].map(f=>(
+        {[{id:"all",l:t("Semua")},{id:"expense",l:"Pengeluaran"},{id:"income",l:"Pemasukan"},{id:"transfer",l:"Transfer"}].map(f=>(
           <button type="button" key={f.id} onClick={()=>setTypeF(f.id)}
             style={{padding:"6px 14px",borderRadius:99,border:"none",cursor:"pointer",whiteSpace:"nowrap",fontSize:12,fontWeight:700,flexShrink:0,
               background:typeF===f.id?G:"#f1f5f9",color:typeF===f.id?"#fff":"#6b7280",transition:"background .15s"}}>{f.l}
@@ -2351,7 +2365,7 @@ function ChartsScreen({ transactions }) {
       </div>
       {/* Date Filter */}
       <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none",marginBottom:12,paddingBottom:2}}>
-        {[{id:"all",l:"Semua"},{id:"today",l:"Hari Ini"},{id:"week",l:"Minggu Ini"},{id:"month",l:"Bulan Ini"},{id:"year",l:"Tahun Ini"},{id:"custom",l:"Custom"}].map(f=>(
+        {[{id:"all",l:t("Semua")},{id:"today",l:t("Hari Ini")},{id:"week",l:t("Minggu Ini")},{id:"month",l:t("Bulan Ini")},{id:"year",l:t("Tahun Ini")},{id:"custom",l:t("Custom")}].map(f=>(
           <button type="button" key={f.id} onClick={()=>setDateF(f.id)}
             style={{padding:"6px 14px",borderRadius:99,border:"none",cursor:"pointer",whiteSpace:"nowrap",fontSize:12,fontWeight:700,flexShrink:0,
               background:dateF===f.id?"#3b82f6":"#f1f5f9",color:dateF===f.id?"#fff":"#6b7280",transition:"background .15s"}}>{f.l}
@@ -2525,11 +2539,11 @@ function MiniGame({ onClose }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:`linear-gradient(160deg,${G},${G2})`,zIndex:500,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
-      <button type="button" onClick={onClose} style={{position:"absolute",top:20,left:20,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:99,width:40,height:40,color:"#fff",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
+      <button type="button" onClick={onClose} style={{position:"absolute",top:20,left:20,background:"rgba(255,255,255,0.2)",border:"none",borderRadius:99,width:40,height:40,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><ArrowLeft size={20}/></button>
 
       {result==="done" ? (
         <div style={{textAlign:"center",color:"#fff"}}>
-          <div style={{fontSize:64,marginBottom:16}}>{score===3?"🏆":score===2?"🥈":"🎉"}</div>
+          <div style={{marginBottom:16,color:score===3?"#f59e0b":score===2?"#9ca3af":G}}>{score===3?<Trophy size={64} strokeWidth={1.5}/>:score===2?<Star size={64} strokeWidth={1.5}/>:<Check size={64} strokeWidth={1.5}/>}</div>
           <p style={{fontSize:28,fontWeight:900,margin:"0 0 8px"}}>{score===3?"SEMPURNA!":score===2?"Bagus!":"Lumayan!"}</p>
           <p style={{fontSize:16,opacity:.85,margin:"0 0 24px"}}>Skor: {score}/3</p>
           <p style={{fontSize:13,opacity:.7,margin:"0 0 32px"}}>
@@ -2654,14 +2668,14 @@ function ProfileScreen({ userName, setUserName, userAvatar, setUserAvatar, trans
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>{t("Preferensi").toUpperCase()}</p>
         <SRow icon={soundEnabled?<Volume2 size={15}/>:<VolumeX size={15}/>} title="Efek Suara" sub="Suara saat mencatat transaksi" right={<Tog on={soundEnabled} onToggle={()=>setSoundEnabled(p=>!p)}/>}/>
-        <SRow icon={<BookOpen size={15}/>} title={t("Bahasa / Language")} sub={lang==="id"?"🇮🇩 Indonesia":"🇺🇸 English"} right={<button type="button" onClick={()=>setLang(lang==="id"?"en":"id")} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>{lang==="id"?"Switch to EN":"Ganti ke ID"}</button>}/>
+        <SRow icon={<BookOpen size={15}/>} title={t("Bahasa / Language")} sub={<span style={{display:"flex",alignItems:"center",gap:5}}><Globe size={13} strokeWidth={1.8}/>{lang==="id"?"Indonesia":"English"}</span>} right={<button type="button" onClick={()=>setLang(lang==="id"?"en":"id")} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:700,cursor:"pointer"}}>{lang==="id"?"Switch to EN":"Ganti ke ID"}</button>}/>
       </Card>
       
       <Card style={{padding:"4px 0",marginBottom:12}}>
         <p style={{padding:"10px 16px 4px",margin:0,fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:1}}>{t("Data").toUpperCase()}</p>
-        <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button type="button" onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Import</button>}/>
-        <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button type="button" onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>Export</button>}/>
-        <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button type="button" onClick={openConfirm} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>Hapus</button>}/>
+        <SRow icon={<Upload size={15}/>} title="Import Data" sub="Excel dari Money Manager" right={<button type="button" onClick={()=>setShowImport(true)} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>{t("Import")}</button>}/>
+        <SRow icon={<Download size={15}/>} title="Export CSV" sub={`${transactions.length} transaksi`} right={<button type="button" onClick={exportCSV} style={{background:GL,border:"none",borderRadius:9,padding:"6px 12px",color:G,fontSize:12,fontWeight:600,cursor:"pointer"}}>{t("Export")}</button>}/>
+        <SRow icon={<Trash2 size={15}/>} bg="#fef2f2" title="Hapus Semua Data" danger right={<button type="button" onClick={openConfirm} style={{background:"#fef2f2",border:"none",borderRadius:9,padding:"6px 12px",color:"#ef4444",fontSize:12,fontWeight:600,cursor:"pointer"}}>{t("Hapus")}</button>}/>
       </Card>
       
       <Card style={{padding:"4px 0"}}>
@@ -2812,6 +2826,7 @@ function FanNav({ tab, setTab, onOpenQuickAdd, darkMode }) {
 
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const { lang, t } = useLang();
   const isPickingFile = useRef(false);
   const openFilePicker = useCallback((refEl) => {
     isPickingFile.current = true;
@@ -2949,6 +2964,10 @@ export default function App() {
     const fromAcc = accounts.find(a => String(a.id) === String(fromId));
     const toAcc   = accounts.find(a => String(a.id) === String(toId));
     if (!fromAcc || !toAcc) return;
+    if (fromAcc.balance < amount) {
+      alert(`Saldo ${fromAcc.name} tidak cukup. Tersedia: ${fromAcc.balance.toLocaleString("id-ID")}, dibutuhkan: ${amount.toLocaleString("id-ID")}`);
+      return;
+    }
 
     setAccounts(p => p.map(a => {
       if (String(a.id) === String(fromId)) return { ...a, balance: a.balance - amount };
@@ -2992,7 +3011,7 @@ export default function App() {
     setShowImport(false);
   }, []);
 
-  const titleMap={home:"Beranda",transactions:"Transaksi",accounts:"Akun",charts:"Analisis",profile:"Profil"};
+  const titleMap={home:t("Beranda"),transactions:t("Transaksi"),accounts:t("Akun"),charts:t("Analisis"),profile:t("Profil")};
 
   if(!onboarded)return<OnboardingScreen onDone={data=>{const {name,age,job,edu}=typeof data==="string"?{name:data,age:0,job:"",edu:""}:data;setUserName(name);lsSet("dk_age",age);lsSet("dk_job",job);lsSet("dk_edu",edu);setOnboarded(true);}}/>;
   if(locked&&pinEnabled)return<PinScreen mode="unlock" savedHash={pinHash} bioEnabled={bioEnabled} onUnlock={()=>setLocked(false)}/>;
